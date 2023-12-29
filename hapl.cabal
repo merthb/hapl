@@ -1,0 +1,42 @@
+cabal-version:      2.4
+name:               hapl
+version:            0.1.0.0
+synopsis:           Plagiarism checker for Haskell codes
+
+-- A longer description of the package.
+-- description:
+homepage:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+license:            MIT
+license-file:       LICENSE
+author:             Merth Borbála
+maintainer:         borka.merth14@gmail.com
+
+-- A copyright notice.
+-- copyright:
+-- category:
+-- extra-source-files: CHANGELOG.md
+
+executable hapl
+    main-is:          Main.hs
+
+    -- Modules included in this executable, other than Main.
+    other-modules:
+        Graph
+        Algorithm
+
+    -- LANGUAGE extensions used by modules in this package.
+    -- other-extensions:
+    build-depends:    
+        base ^>=4.16.1.0,
+        haskell-src-exts-simple,
+        filepath,
+        astar,
+        hashable,
+        unordered-containers ^>=0.2.7.1,
+        async,
+        parallel
+    hs-source-dirs:   src
+    default-language: GHC2021
