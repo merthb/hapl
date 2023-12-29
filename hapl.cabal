@@ -9,7 +9,7 @@ homepage:
 
 -- A URL where users can report bugs.
 -- bug-reports:
-license:            MIT
+license:            GNU LGPL
 license-file:       LICENSE
 author:             Merth Borbála
 maintainer:         borka.merth14@gmail.com
