@@ -32,13 +32,14 @@ executable hapl
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends:    
-        base ^>=4.16.1.0,
+        base ^>=4.17.1.0,
         haskell-src-exts-simple,
         filepath,
         astar,
         hashable,
         unordered-containers ^>=0.2.7.1,
         async,
-        parallel
+        parallel,
+        Glob
     hs-source-dirs:   src
     default-language: GHC2021

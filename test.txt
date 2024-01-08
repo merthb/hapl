@@ -1,5 +1,2 @@
 formationFix over fight haskellBlast multiHeal
-C:\Users\borka\Documents\ELTE\7.felev\fp\nagybead\r237499fff8d7f06b0ea763ecd\cjj14n\Beadando.hs
-C:\Users\borka\Documents\ELTE\7.felev\fp\nagybead\r237499fff8d7f06b0ea763ecd\azp0xe\bighw-v3.hs
-C:\Users\borka\Documents\ELTE\7.felev\fp\nagybead\r237499fff8d7f06b0ea763ecd\a4liol\beadando.hs
-C:\Users\borka\Documents\ELTE\7.felev\fp\nagybead\r237499fff8d7f06b0ea763ecd\agzw7v\nagybeadando.hs
+../funkcprog/hf-sol/r96230af3d10493973c0d74b62/*/*.hs
