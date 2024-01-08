@@ -13,7 +13,14 @@ main = do
     (fs, paths) <- filePathReader -- needs the path to the file with the infos
     codes <- parseAllCodes paths fs
     resps <- runParallel codes
-    putStrLn $ show $ map (\ (id1, id2, resps) -> (id1, id2, zip fs resps)) resps
+    putStrLn $ writeRes resps 1
+
+writeRes :: [Response] -> Int -> String
+writeRes [] _ = ""
+writeRes (x:xs) n = writeResH x n ++ "\n" ++ writeRes xs (n + 1) where
+    writeResH (id1, id2, matches) i = show i ++ ". " ++ show id1 ++ " <-> \n" ++ show id2 ++ ":\n" ++ showMatches matches where
+        showMatches [] = ""
+        showMatches ((fn, num):xs) = '\t' : fn ++ ": " ++ show num ++ "%\n" ++ showMatches xs
 
 type FunName = String
 
@@ -25,7 +32,7 @@ runParallel = sequence . parMap rpar runAlg . makePairs
 
 runAlg :: (Code, Code) -> IO Response
 runAlg ((id1, g), (id2, h)) = do
-    matchnums <- sequence $ parMap rpar (\ (x,y) -> pure $ mainAlgorithm x y) (zipOnFunName g h)
+    matchnums <- sequence $ parMap rpar (\ (fn, x, y) -> pure $ (fn, mainAlgorithm x y)) (zipOnFunName g h)
     pure (id1, id2, matchnums)
 
 parseCode :: FilePath -> [FunName] -> IO Code
