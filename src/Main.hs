@@ -24,7 +24,9 @@ runParallel :: [Code] -> IO [Response]
 runParallel = sequence . parMap rpar runAlg . makePairs
 
 runAlg :: (Code, Code) -> IO Response
-runAlg ((id1, g), (id2, h)) = pure (id1, id2, map (\ (x,y) -> mainAlgorithm x y) (zipOnFunName g h))
+runAlg ((id1, g), (id2, h)) = do
+    matchnums <- sequence $ parMap rpar (\ (x,y) -> pure $ mainAlgorithm x y) (zipOnFunName g h)
+    pure (id1, id2, matchnums)
 
 parseCode :: FilePath -> [FunName] -> IO Code
 parseCode p fs = do
@@ -35,10 +37,10 @@ parseCode p fs = do
 
 parseAllCodes :: [FilePath] -> [FunName] -> IO [Code]
 parseAllCodes [] _ = pure []
-parseAllCodes (p:ps) fs = do
-        c <- parseCode p fs
-        cs <- parseAllCodes ps fs
-        pure (c:cs)
+parseAllCodes (x:xs) fs = do
+    c <- parseCode x fs
+    cs <- parseAllCodes xs fs
+    pure (c:cs)
 
 parseFilePath :: IO FilePath
 parseFilePath = do
@@ -48,7 +50,7 @@ parseFilePath = do
         _ -> pure ""
 
 filePathReader :: IO ([FunName],[FilePath])
-filePathReader = do  
+filePathReader = do
     path <- parseFilePath
     content <- readFile path
     pure (words $ head $ lines content, filter System.FilePath.isValid $ tail $ lines content)
