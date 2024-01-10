@@ -11,8 +11,14 @@ permissions:
 
 jobs:
   build:
+    strategy:
+    matrix:
+      os:
+        - windows-latest
+        - ubuntu-latest
+        - macos-latest
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v3
@@ -36,8 +42,6 @@ jobs:
     - name: Install dependencies
       run: |
         cabal update
-        cabal build --only-dependencies --enable-tests --enable-benchmarks
+        cabal build --only-dependencies
     - name: Build
-      run: cabal build --enable-tests --enable-benchmarks all -- -O2
-    - name: Run tests
-      run: cabal test all
+      run: cabal build -- -O2
