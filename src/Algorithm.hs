@@ -9,7 +9,7 @@ type ID = String
 type Code = (ID, [CallGraph]) -- each graph gets a unique id so that the results will be matched to the right codes
 
 type MatchNum = Int
-type Response = (ID, ID, [MatchNum])
+type Response = (ID, ID, [(String, MatchNum)])
 
 heuristic :: CallGraph -> CallGraph -> CallGraph -> Int -- h(n) = cost_of_subst * min(RG, RH) + cost_of_insdel * abs(RG - RH)
 heuristic startg goalg g = min rgn rhn + abs (rgn - rhn) where 
@@ -37,7 +37,7 @@ cost :: CallGraph -> CallGraph -> Int -- cost of getting from graph g to graph h
 cost g@(Vertex gf gs) h@(Vertex hf hs)
     | gf == hf = sum (map (uncurry cost) zipped) + (length sgs - length zipped) + (length shs - length zipped)
     | otherwise = 1 + sum (map (uncurry cost) zipped) + (length sgs - length zipped) + (length shs - length zipped)  where
-        zipped = zipOnFunName sgs shs
+        zipped = map (\(x, y, z) -> (y, z)) $ zipOnFunName sgs shs
         sgs = sort gs
         shs = sort hs
 
@@ -68,11 +68,11 @@ makePairs (x:xs) = pairElement x xs ++ makePairs xs where
     pairElement e (x:xs) = (e , x) : pairElement e xs
 
 runOnAll :: [Code] -> [Response]
-runOnAll = map (\ ((id1, g), (id2, h)) -> (id1, id2, map (\ (x,y) -> mainAlgorithm x y) (zipOnFunName g h))) . makePairs
+runOnAll = map (\ ((id1, g), (id2, h)) -> (id1, id2, map (\ (fn, x, y) -> (fn, mainAlgorithm x y)) (zipOnFunName g h))) . makePairs
 
-zipOnFunName :: [CallGraph] -> [CallGraph] -> [(CallGraph, CallGraph)]
+zipOnFunName :: [CallGraph] -> [CallGraph] -> [(String, CallGraph, CallGraph)]
 zipOnFunName [] _ = []
 zipOnFunName _ [] = []
 zipOnFunName (vf@(Vertex (F fn fty _) _):fs) gs
-    | Just vg <- find (\ (Vertex (F n ty _) _) -> fn == n && fty == ty) gs = (vf, vg) : zipOnFunName fs gs
+    | Just vg <- find (\ (Vertex (F n ty _) _) -> fn == n && fty == ty) gs = (dropWhile (=='.') fn, vf, vg) : zipOnFunName fs gs
     | otherwise = zipOnFunName fs gs

@@ -1,2 +1,2 @@
-formationFix over fight haskellBlast multiHeal
+fromNotation
 ../funkcprog/hf-sol/r96230af3d10493973c0d74b62/*/*.hs
