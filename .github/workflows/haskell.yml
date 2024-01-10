@@ -12,11 +12,11 @@ permissions:
 jobs:
   build:
     strategy:
-    matrix:
-      os:
-        - windows-latest
-        - ubuntu-latest
-        - macos-latest
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
 
     runs-on: ${{ matrix.os }}
 
