@@ -1,4 +1,4 @@
-module Algorithm where
+module Algorithm (Code(..),Response(..),mainAlgorithm,zipOnFunName,makePairs,runOnAll) where
 
 import Graph
 import Data.Graph.AStar

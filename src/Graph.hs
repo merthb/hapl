@@ -1,4 +1,4 @@
-module Graph where
+module Graph (Graph(..),Function(..),CallGraph(..),inG,vertNum,edgeNum,insertEdge,deleteEdge,startsWith,getCallGraphs) where
 import Language.Haskell.Exts.Simple
 import Data.List
 import Data.Hashable
