@@ -1,4 +1,3 @@
-{-# LANGUAGE GADTs #-}
 module Graph where
 import Language.Haskell.Exts.Simple
 import Data.List
@@ -299,7 +298,7 @@ procExp (ParArrayFromThenTo exp1 exp2 exp3) rs = ParArrayFromThenTo (procExp exp
 procExp (ListComp exp qstmts) rs = ListComp (procExp exp rs) (procQStmts qstmts rs)
 procExp x _ = x
 
----------------- function collection ---------------------------
+---------------- function & function call collection ---------------------------
 
 parseInFile :: [Decl] -> [Function]
 parseInFile xs = parseDec xs []

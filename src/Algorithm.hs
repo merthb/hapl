@@ -75,4 +75,5 @@ zipOnFunName [] _ = []
 zipOnFunName _ [] = []
 zipOnFunName (vf@(Vertex (F fn fty _) _):fs) gs
     | Just vg <- find (\ (Vertex (F n ty _) _) -> fn == n && fty == ty) gs = (dropWhile (=='.') fn, vf, vg) : zipOnFunName fs gs
+    | Just vg <- find (\ (Vertex (F n ty _) _) -> fn == n) gs = (dropWhile (=='.') fn, vf, vg) : zipOnFunName fs gs
     | otherwise = zipOnFunName fs gs
