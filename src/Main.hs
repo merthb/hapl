@@ -54,7 +54,9 @@ parseFilePath = do
     x <- getLine
     case System.FilePath.isValid x of
         True -> pure x
-        _ -> pure ""
+        _ -> do
+            putStrLn "Invalid filepath, try again"
+            parseFilePath
 
 filePathReader :: IO ([FunName],[FilePath])
 filePathReader = do
