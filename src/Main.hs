@@ -54,5 +54,9 @@ filePathReader :: IO ([FunName], [FilePath])
 filePathReader = do
   path <- parseFilePath
   content <- readFile path
-  files <- glob $ head $ tail $ lines content
-  pure (words $ head $ lines content, filter System.FilePath.isValid files)
+  let input = map compile $ tail $ lines content
+  let patterns = filter (not . isLiteral) input
+  let files = filter isLiteral input
+  globbed <- concat <$> traverse (glob . decompile) patterns
+  let fin = map decompile files ++ globbed
+  pure (words $ head $ lines content, filter System.FilePath.isValid fin)
