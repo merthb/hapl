@@ -44,4 +44,4 @@ jobs:
         cabal update
         cabal build --only-dependencies
     - name: Build
-      run: cabal build -- -O2
+      run: cabal build hapl -- -O2
