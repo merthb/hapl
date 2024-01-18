@@ -1,4 +1,4 @@
-module Graph where
+module Graph (Graph(..),Function(..),CallGraph(..),inG,vertNum,edgeNum,insertEdge,deleteEdge,startsWith,getCallGraphs) where
 import Language.Haskell.Exts.Simple
 import Data.List
 import Data.Hashable
@@ -88,7 +88,7 @@ allDifferent (x:xs)
 
 preprocess :: [Decl] -> [Decl]
 preprocess xs = preprocess' $ preprocFunBinds nxs $ map (\ (F n _ _) -> n) $ parseInFile nxs where
-    nxs = renameGlobals xs
+    nxs = renameGlobals xs $ globalScopeFuns xs
 
 preprocess' :: [Decl] -> [Decl]
 preprocess' xs
@@ -114,16 +114,20 @@ recheckMatches [] _ = []
 recheckMatches ((Match fn pb rhs (Just (BDecls d))):xs) fs = (Match fn pb rhs (Just (BDecls (preprocFunBinds d fs)))) : recheckMatches xs fs
 recheckMatches (x:xs) fs = x : recheckMatches xs fs
 
-renameGlobals :: [Decl] -> [Decl]
-renameGlobals [] = []
-renameGlobals ((FunBind matches):xs) = (FunBind $ matchRn matches) : renameGlobals xs where
-    matchRn [] = []
-    matchRn ((Match fn a b c):ms) = Match (setName fn ('.':getName fn)) a b c : matchRn ms
-    matchRn (m:ms) = m : matchRn ms
-renameGlobals ((TypeSig fns ty):xs) = TypeSig (rnNames fns) ty : renameGlobals xs where
+renameGlobals :: [Decl] -> [String] -> [Decl]
+renameGlobals [] _ = []
+renameGlobals ((FunBind matches):xs) fs = (FunBind $ matchRn matches (map (\ f -> (f, '.':f)) fs)) : renameGlobals xs ((\ (Match fn _ _ _) -> getName fn) (head matches):fs) where
+    matchRn [] _ = []
+    matchRn ((Match fn pb rhs binds):ms) ffs = Match (setName fn ('.':getName fn)) pb (rhsChecker rhs ffs) (bindsChecker binds ffs) : matchRn ms ffs
+    matchRn (m:ms) ffs = m : matchRn ms ffs
+renameGlobals ((TypeSig fns ty):xs) fs = TypeSig (rnNames fns) ty : renameGlobals xs fs where
     rnNames [] = []
     rnNames (x:xs) = setName x ('.':getName x) : rnNames xs
-renameGlobals (x:xs) = x : renameGlobals xs
+renameGlobals (x:xs) fs = x : renameGlobals xs fs
+
+bindsChecker :: Maybe Binds -> [(String, String)] -> Maybe Binds
+bindsChecker (Just (BDecls d)) fs = Just $ BDecls $ renameInDecl d fs
+bindsChecker x _ = x
 
 globalScopeFuns :: [Decl] -> [String]
 globalScopeFuns [] = []
@@ -281,7 +285,7 @@ procExp (Let (BDecls decl) exp) rs = Let (BDecls (renameInDecl decl rs)) (procEx
 procExp (Let x exp) rs = Let x $ procExp exp rs
 procExp (If exp1 exp2 exp3) rs = If (procExp exp1 rs) (procExp exp2 rs) (procExp exp3 rs)
 procExp (MultiIf grhss) rs = MultiIf $ (\ (GuardedRhss rhss) -> rhss) (rhsChecker (GuardedRhss grhss) rs)
-procExp (Case exp alts) rs = Case (procExp exp rs) $ map (\ x -> case x of (Alt a rhs (Just (BDecls dcl))) -> Alt a (rhsChecker rhs rs) (Just (BDecls (renameInDecl dcl rs)))) alts
+procExp (Case exp alts) rs = Case (procExp exp rs) $ map (\ x -> case x of (Alt a rhs (Just (BDecls dcl))) -> Alt a (rhsChecker rhs rs) (Just (BDecls (renameInDecl dcl rs))); (Alt a rhs binds) -> Alt a (rhsChecker rhs rs) binds) alts
 procExp (Do stmts) rs = Do (procStmts stmts rs)
 procExp (MDo stmts) rs = MDo (procStmts stmts rs)
 procExp (Tuple b exps) rs = Tuple b (map (flip procExp rs) exps)
