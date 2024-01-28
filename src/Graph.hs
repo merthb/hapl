@@ -1,53 +1,56 @@
-module Graph (Graph(..),Function(..),CallGraph(..),inG,vertNum,edgeNum,insertEdge,deleteEdge,startsWith,getCallGraphs) where
+{-# LANGUAGE GADTs #-}
+module Graph where
 import Language.Haskell.Exts.Simple
 import Data.List
 import Data.Hashable
+import qualified Data.HashSet as HS
 
 -- this module is for the call-graph algebraic data structure
 
 -- the graph implementation we will use to represent the call-graph
-data Graph a = Vertex {node :: a, edges :: [Graph a]}
+data Graph a = Vertex {node :: a, edges :: HS.HashSet (Graph a)}
     deriving (Eq, Ord)
 
 instance Show a => Show (Graph a) where
-    show (Vertex node edges) = case edges of
-        [] -> show node
-        xs -> show node ++ " => " ++ show xs
+    show (Vertex node edges) = case HS.null edges of
+        True -> show node
+        False -> show node ++ " => " ++ show edges
 
 instance (Hashable a) => Hashable (Graph a) where
     hashWithSalt salt (Vertex val children) = hashWithSalt (hashWithSalt salt val) childrenHash where
-        childrenHash = foldl hashWithSalt 0 (map (hashWithSalt salt) children)
+        childrenHash = HS.foldr hashWithSalt 0 (HS.map (hashWithSalt salt) children)
 
--- functions have their unique names and their type signatures
+-- functions have their unique names, their type signatures and a flag for recursiveness
 data Function = F String String Bool
     deriving (Eq, Ord)
 
 instance Hashable Function where
     hashWithSalt salt (F name typ boolVal) = hashWithSalt (hashWithSalt (hashWithSalt salt name) typ) boolVal
 
--- our call-graph will be a graph that contains functions for we want to represent the function calls in the code
-type CallGraph = Graph Function
-
 instance Show Function where
     show (F name ty r) = name ++ " :: " ++ ty ++ " (rec: " ++ show r ++ ")"
 
+-- our call-graph will be a graph that contains functions for we want to represent the function calls in the code
+type CallGraph = Graph Function
+
 ------------- some graph and parse functions ----------------------------
+
 inG :: Function -> CallGraph -> Bool
 inG f (Vertex v vs)
     | f == v = True
-    | otherwise = any (inG f) vs
+    | otherwise = HS.foldr (||) False $ HS.map (inG f) vs
 
 vertNum :: CallGraph -> Int
-vertNum (Vertex f fs) = 1 + sum (map edgeNum fs)
+vertNum (Vertex f fs) = 1 + HS.foldr (+) 0 (HS.map vertNum fs)
 
 edgeNum :: CallGraph -> Int
-edgeNum (Vertex f fs) = length fs + sum (map edgeNum fs)
+edgeNum (Vertex f fs) = HS.size fs + HS.foldr (+) 0 (HS.map edgeNum fs)
 
 insertEdge :: CallGraph -> CallGraph -> CallGraph
-insertEdge (Vertex f fs) g = (Vertex f (g : fs))
+insertEdge (Vertex f fs) g = Vertex f (HS.insert g fs)
 
 deleteEdge :: CallGraph -> CallGraph -> CallGraph
-deleteEdge fg@(Vertex f fs) g = Vertex f (delete g fs)
+deleteEdge (Vertex f fs) g = Vertex f (HS.delete g fs)
 
 startsWith :: Function -> CallGraph -> Bool
 startsWith f (Vertex g _) = f == g
@@ -64,7 +67,7 @@ showType x = ""
 
 toType :: [Char] -> Type
 toType [x] = TyVar (Ident [x])
-toType (x:xs) = TyApp (TyVar (Ident [x])) (toType xs)
+toType (x:xs) = TyFun (TyVar (Ident [x])) (toType xs)
 
 filteredPreludeFuns :: [String]
 filteredPreludeFuns = ["length", "map", "filter", "all", "any", "and", "or", "++", "concat", "concatMap", ":", "scanl", "scanr", "iterate", "cycle", "replicate", "repeat", "take", "takeWhile", "drop", "dropWhile", "span", "break", "splitAt", "notElem", "lookup", "zip", "zipWith", "unzip", "lines", "unlines", "words", "unwords", "head", "tail", "last", "init", "!!", "null", "reverse", "max", "min", "maximum", "minimum", "id", ".", "not", "&&", "||", "fst", "snd", "curry", "uncurry", "fromInteger", "toInteger", "even", "odd", "fromIntegral", "foldl", "foldr", "elem", "sum", "product", "const", "flip", "until", "error", "undefined", "show", "read"]
@@ -78,7 +81,7 @@ getName name = case name of Ident xs -> xs; Symbol xs -> xs
 setName :: Name -> String -> Name
 setName name n = case name of Ident xs -> Ident n; Symbol xs -> Symbol n
 
----------------- preprocess local blocks ---------------------------
+---------------- preprocess code files ---------------------------
 
 allDifferent :: (Eq a) => [a] -> Bool
 allDifferent [] = True
@@ -88,7 +91,7 @@ allDifferent (x:xs)
 
 preprocess :: [Decl] -> [Decl]
 preprocess xs = preprocess' $ preprocFunBinds nxs $ map (\ (F n _ _) -> n) $ parseInFile nxs where
-    nxs = renameGlobals xs $ globalScopeFuns xs
+    nxs = renameGlobals xs
 
 preprocess' :: [Decl] -> [Decl]
 preprocess' xs
@@ -102,7 +105,7 @@ preprocFunBinds (f@(FunBind (m@(Match fn patts _ _):ms)):xs) fs
     | needsTypeSig m fs = (TypeSig [fn] (toType $ createTypeSig patts ['a'..])) : (FunBind $ recheckMatches (m:ms) fs) : preprocFunBinds xs fs
     | otherwise = (FunBind $ recheckMatches (m:ms) fs) : preprocFunBinds xs fs where
         createTypeSig [] (a:as) = [a]
-        createTypeSig (_:xs) (a:as) = a : " -> " ++ createTypeSig xs as 
+        createTypeSig (_:xs) (a:as) = a : createTypeSig xs as 
 preprocFunBinds (x:xs) fs = x : preprocFunBinds xs fs
 
 needsTypeSig :: Match -> [String] -> Bool
@@ -114,20 +117,16 @@ recheckMatches [] _ = []
 recheckMatches ((Match fn pb rhs (Just (BDecls d))):xs) fs = (Match fn pb rhs (Just (BDecls (preprocFunBinds d fs)))) : recheckMatches xs fs
 recheckMatches (x:xs) fs = x : recheckMatches xs fs
 
-renameGlobals :: [Decl] -> [String] -> [Decl]
-renameGlobals [] _ = []
-renameGlobals ((FunBind matches):xs) fs = (FunBind $ matchRn matches (map (\ f -> (f, '.':f)) fs)) : renameGlobals xs ((\ (Match fn _ _ _) -> getName fn) (head matches):fs) where
-    matchRn [] _ = []
-    matchRn ((Match fn pb rhs binds):ms) ffs = Match (setName fn ('.':getName fn)) pb (rhsChecker rhs ffs) (bindsChecker binds ffs) : matchRn ms ffs
-    matchRn (m:ms) ffs = m : matchRn ms ffs
-renameGlobals ((TypeSig fns ty):xs) fs = TypeSig (rnNames fns) ty : renameGlobals xs fs where
+renameGlobals :: [Decl] -> [Decl]
+renameGlobals [] = []
+renameGlobals ((FunBind matches):xs) = (FunBind $ matchRn matches) : renameGlobals xs where
+    matchRn [] = []
+    matchRn ((Match fn a b c):ms) = Match (setName fn ('.':getName fn)) a b c : matchRn ms
+    matchRn (m:ms) = m : matchRn ms
+renameGlobals ((TypeSig fns ty):xs) = TypeSig (rnNames fns) ty : renameGlobals xs where
     rnNames [] = []
     rnNames (x:xs) = setName x ('.':getName x) : rnNames xs
-renameGlobals (x:xs) fs = x : renameGlobals xs fs
-
-bindsChecker :: Maybe Binds -> [(String, String)] -> Maybe Binds
-bindsChecker (Just (BDecls d)) fs = Just $ BDecls $ renameInDecl d fs
-bindsChecker x _ = x
+renameGlobals (x:xs) = x : renameGlobals xs
 
 globalScopeFuns :: [Decl] -> [String]
 globalScopeFuns [] = []
@@ -285,7 +284,7 @@ procExp (Let (BDecls decl) exp) rs = Let (BDecls (renameInDecl decl rs)) (procEx
 procExp (Let x exp) rs = Let x $ procExp exp rs
 procExp (If exp1 exp2 exp3) rs = If (procExp exp1 rs) (procExp exp2 rs) (procExp exp3 rs)
 procExp (MultiIf grhss) rs = MultiIf $ (\ (GuardedRhss rhss) -> rhss) (rhsChecker (GuardedRhss grhss) rs)
-procExp (Case exp alts) rs = Case (procExp exp rs) $ map (\ x -> case x of (Alt a rhs (Just (BDecls dcl))) -> Alt a (rhsChecker rhs rs) (Just (BDecls (renameInDecl dcl rs))); (Alt a rhs binds) -> Alt a (rhsChecker rhs rs) binds) alts
+procExp (Case exp alts) rs = Case (procExp exp rs) $ map (\ x -> case x of (Alt a rhs (Just (BDecls dcl))) -> Alt a (rhsChecker rhs rs) (Just (BDecls (renameInDecl dcl rs)))) alts
 procExp (Do stmts) rs = Do (procStmts stmts rs)
 procExp (MDo stmts) rs = MDo (procStmts stmts rs)
 procExp (Tuple b exps) rs = Tuple b (map (flip procExp rs) exps)
@@ -446,10 +445,10 @@ getCallGraphs fsn decl = filter (\ (Vertex (F n t r) fs) -> elem (dropWhile (=='
     dict = flagRecursion (findRec d) d
 
 genGraph :: [(Function, [Function])] -> [Function] -> (Function, [Function]) -> CallGraph
-genGraph dict procc (f, fs) = Vertex f $ genChilds fs dict (f:procc)where
+genGraph dict procc (f, fs) = Vertex f $ HS.fromList $ genChilds fs dict (f:procc) where
     genChilds :: [Function] -> [(Function, [Function])] -> [Function] -> [CallGraph]
     genChilds [] _ _ = []
-    genChilds (f@(F n "" r):fs) d p = Vertex f [] : genChilds fs d p
+    genChilds (f@(F n "" r):fs) d p = Vertex f HS.empty : genChilds fs d p
     genChilds (f:fs) dict processed
         | Just fss <- lookup f dict = genGraph dict processed (f, filter (\ g -> not $ elem g processed) fss) : genChilds fs dict processed
         | otherwise = genChilds fs dict processed

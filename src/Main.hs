@@ -7,6 +7,7 @@ import Language.Haskell.Exts.Simple
 import System.FilePath
 import Control.Concurrent.Async
 import Control.Parallel.Strategies
+import Data.List
 import Graph
 import Language.Haskell.Exts.Simple
 import System.FilePath
@@ -37,7 +38,7 @@ runParallel = sequence . parMap rpar runAlg . makePairs
 
 runAlg :: (Code, Code) -> IO Response
 runAlg ((id1, g), (id2, h)) = do
-    matchnums <- sequence $ parMap rpar (\ (fn, x, y) -> pure $ (fn, mainAlgorithm x y)) (zipOnFunName g h)
+    matchnums <- sequence $ map (\ (fn, x, y) -> pure $ (fn, mainAlgorithm x y)) (zipOnFunName g h)
     pure (id1, id2, matchnums)
 
 parseCode :: FilePath -> [FunName] -> IO Code
@@ -59,9 +60,7 @@ parseFilePath = do
     x <- getLine
     case System.FilePath.isValid x of
         True -> pure x
-        _ -> do
-            putStrLn "Invalid filepath, try again"
-            parseFilePath
+        _ -> pure ""
 
 filePathReader :: IO ([FunName],[FilePath])
 filePathReader = do
