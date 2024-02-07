@@ -13,8 +13,15 @@ main :: IO ()
 main = do
     (fs, paths) <- filePathReader -- needs the path to the file with the infos
     codes <- parseAllCodes paths fs
+    codes' <- parseAllCodes' paths
+    -- putStrLn $ show codes' ++ "\n"
+    -- putStrLn $ show codes
     resps <- runParallel codes
+    resps' <- runParallel codes'
+    putStrLn "By functions:"
     putStrLn $ writeRes resps 1
+    putStrLn "Whole codes:"
+    putStrLn $ writeRes resps' 1
 
 writeRes :: [Response] -> Int -> String
 writeRes [] _ = ""
@@ -48,6 +55,20 @@ parseAllCodes [] _ = pure []
 parseAllCodes (x:xs) fs = do
     c <- parseCode x fs
     cs <- parseAllCodes xs fs
+    pure (c:cs)
+
+parseCode' :: FilePath -> IO Code
+parseCode' p = do
+    x <- parseFile p
+    case x of
+        ParseOk (Module _ _ _ d) -> pure (p, [wholeCodeGraph d])
+        _ -> error $ "Parse failed for file: " ++ p
+
+parseAllCodes' :: [FilePath] -> IO [Code]
+parseAllCodes' [] = pure []
+parseAllCodes' (x:xs) = do
+    c <- parseCode' x
+    cs <- parseAllCodes' xs
     pure (c:cs)
 
 parseFilePath :: IO FilePath
