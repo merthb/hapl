@@ -39,6 +39,7 @@ executable hapl
         hashable,
         unordered-containers ^>=0.2.7.1,
         async,
-        parallel
+        parallel,
+        directory ^>=1.3.8.3
     hs-source-dirs:   src
     default-language: GHC2021

@@ -1,6 +1,8 @@
 module Main where
 
 import System.IO
+import System.Exit
+import System.Directory
 import Graph
 import Algorithm
 import Language.Haskell.Exts.Simple
@@ -11,17 +13,42 @@ import Data.List
 
 main :: IO ()
 main = do
+    putStrLn "This is a console program, that checks plagiarism between Haskell programs by a call-graph matching algorithm. So to say, with this plagiarism checker we check if the logic behind the codes are similar, without looking at the text level of the codes."
+    loop
+
+loop :: IO ()
+loop = do
+    oneTimeRunner
+    putStrLn "If you want to run another plagiarism check, push the SPACE and then the ENTER button, if you want to quit, just push the ENTER button."
+    x <- getLine
+    case x of
+        " " -> loop
+        _ -> exitSuccess
+
+oneTimeRunner :: IO ()
+oneTimeRunner = do
+    putStrLn "To run the plagiarism checker the program needs a text file with the following informations:"
+    putStrLn "First line must contain the function names, that have to be checked individually. If empty, only whole codes are checked."
+    putStrLn "From second line on each line must contain one path to a file (or a global pattern to files), that must be checked."
+    putStrLn "Give the info filepath:"
     (fs, paths) <- filePathReader -- needs the path to the file with the infos
-    codes <- parseAllCodes paths fs
-    codes' <- parseAllCodes' paths
-    -- putStrLn $ show codes' ++ "\n"
-    -- putStrLn $ show codes
-    resps <- runParallel codes
-    resps' <- runParallel codes'
-    putStrLn "By functions:"
-    putStrLn $ writeRes resps 1
-    putStrLn "Whole codes:"
-    putStrLn $ writeRes resps' 1
+    case fs of
+        [] -> do
+            codes' <- parseAllCodes' paths
+            resps' <- runParallel codes'
+            putStrLn "Whole codes:"
+            putStrLn $ writeRes resps' 1
+        _ -> do
+            codes <- parseAllCodes paths fs
+            codes' <- parseAllCodes' paths
+            resps <- runParallel codes
+            resps' <- runParallel codes'
+            putStrLn "Result of functions:"
+            putStrLn $ writeRes resps 1
+            putStrLn "Whole codes:"
+            putStrLn $ writeRes resps' 1
+
+
 
 writeRes :: [Response] -> Int -> String
 writeRes [] _ = ""
@@ -74,9 +101,14 @@ parseAllCodes' (x:xs) = do
 parseFilePath :: IO FilePath
 parseFilePath = do
     x <- getLine
-    case System.FilePath.isValid x of
-        True -> pure x
-        _ -> pure ""
+    b <- System.Directory.doesFileExist x
+    if b 
+        then 
+            pure x
+        else 
+            do
+                putStrLn "File doesn't exist, try again:"
+                parseFilePath
 
 filePathReader :: IO ([FunName],[FilePath])
 filePathReader = do
