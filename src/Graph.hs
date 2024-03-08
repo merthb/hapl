@@ -88,17 +88,8 @@ allDifferent [] = True
 allDifferent (x:xs) 
     | myelem x xs = False 
     | otherwise = allDifferent xs where
+        myelem :: Function -> [Function] -> Bool
         myelem (F fn _ _) fs = not $ null $ filter (\ (F gn _ _) -> fn == gn) fs
-
--- preprocess :: [Decl] -> [Decl]
--- preprocess xs = preprocess' $ preprocFunBinds nxs $ map (\ (F n _ _) -> n) $ parseInFile nxs where
---     nxs = renameGlobals xs $ globalScopeFuns xs
-
--- preprocess' :: [Decl] -> [Decl]
--- preprocess' xs
---     | allDifferent fs = xs
---     | otherwise = preprocess' $ globalScopeChecker xs $ globalScopeFuns xs where
---         fs = parseInFile xs
 
 prep :: [Decl] -> [Decl]
 prep xs = prep' $ preprocFunBinds nxs $ map (\ (F n _ _) -> n) $ parseInFile nxs where
@@ -108,8 +99,8 @@ prep' :: [Decl] -> [Decl]
 prep' xs
     | allDifferent (parseInFile decl) = decl
     | otherwise = prep' decl where
-    renames = whatToRename $ parseInFile xs
-    decl = doPrep renames xs
+        renames = whatToRename $ parseInFile xs
+        decl = doPrep renames xs
 
 doPrep :: [(String, String)] -> [Decl] -> [Decl]
 doPrep [] decl = decl
@@ -122,9 +113,7 @@ whatToRename xs = concatMap (\ xs -> map (\ (F fn ft fr) -> rename fn) (drop 1 x
 
 findLocalScope :: String -> [Decl] -> Bool
 findLocalScope f [] = False
-findLocalScope fn (t@(TypeSig names ty):ds)
-    | elem fn (map getName names) = True
-    | otherwise = findLocalScope fn ds
+findLocalScope fn (t@(TypeSig names ty):ds) = elem fn (map getName names) || findLocalScope fn ds
 findLocalScope f (m@(FunBind matches):ds) = inLocals f matches || findLocalScope f ds
 findLocalScope f ((PatBind _ _ (Just (BDecls decl))):ds) = findLocalScope f decl || findLocalScope f ds
 findLocalScope f (d:ds) = findLocalScope f ds
@@ -149,6 +138,7 @@ preprocFunBinds [] _ = []
 preprocFunBinds (f@(FunBind (m@(Match fn patts _ _):ms)):xs) fs 
     | needsTypeSig m fs = (TypeSig [fn] (toType $ createTypeSig patts ['a'..])) : (FunBind $ recheckMatches (m:ms) fs) : preprocFunBinds xs fs
     | otherwise = (FunBind $ recheckMatches (m:ms) fs) : preprocFunBinds xs fs where
+        createTypeSig :: [Pat] -> [Char] -> [Char]
         createTypeSig [] (a:as) = [a]
         createTypeSig (_:xs) (a:as) = a : createTypeSig xs as 
 preprocFunBinds (x:xs) fs = x : preprocFunBinds xs fs
@@ -168,10 +158,12 @@ rename xs = (xs, '.':xs)
 renameGlobals :: [Decl] -> [String] -> [Decl]
 renameGlobals [] _ = []
 renameGlobals ((FunBind matches):xs) fs = (FunBind $ matchRn matches (map rename fs)) : renameGlobals xs ((\ (Match fn _ _ _) -> getName fn) (head matches):fs) where
+    matchRn :: [Match] -> [(String, String)] -> [Match]
     matchRn [] _ = []
     matchRn ((Match fn pb rhs binds):ms) ffs = Match (setName fn ('.':getName fn)) pb (rhsChecker rhs ffs) (bindsChecker binds ffs) : matchRn ms ffs
     matchRn (m:ms) ffs = m : matchRn ms ffs
 renameGlobals ((TypeSig fns ty):xs) fs = TypeSig (rnNames fns) ty : renameGlobals xs fs where
+    rnNames :: [Name] -> [Name]
     rnNames [] = []
     rnNames (x:xs) = setName x ('.':getName x) : rnNames xs
 renameGlobals (x:xs) fs = x : renameGlobals xs fs
@@ -183,87 +175,10 @@ bindsChecker x _ = x
 globalScopeFuns :: [Decl] -> [String]
 globalScopeFuns [] = []
 globalScopeFuns ((FunBind (m:ms)):xs) = getFunName m : globalScopeFuns xs where
+    getFunName :: Match -> String
     getFunName (Match fn _ _ _) = getName fn
 globalScopeFuns ((PatBind (PVar fn) _ _):xs) = getName fn : globalScopeFuns xs
 globalScopeFuns (x:xs) = globalScopeFuns xs
-
--- globalScopeChecker :: [Decl] -> [String] -> [Decl]
--- globalScopeChecker [] _ = []
--- globalScopeChecker ((FunBind matches):xs) fs = let (m, nfs, _) = globalMatchesChecker matches fs [] in (FunBind m) : globalScopeChecker xs nfs
--- globalScopeChecker ((PatBind fn rhs (Just (BDecls decl))):xs) fs = let (nrhs, nbinds, nfs, _) = localPatChecker rhs decl fs [] in (PatBind fn nrhs (Just (BDecls nbinds))) : globalScopeChecker xs nfs
--- globalScopeChecker (x:xs) fs = x : globalScopeChecker xs fs
-
--- globalMatchesChecker :: [Match] -> [String] -> [(String, String)] -> ([Match], [String], [(String, String)])
--- globalMatchesChecker [] fs rs = ([], fs, rs)
--- globalMatchesChecker (m@(Match fn pb rhs binds):ms) fs rs = case binds of
---     Just (BDecls decl) -> let 
---         (ndecl, nfs, renames) = localScopeChecker decl fs rs
---         nrhs = rhsChecker rhs renames
---         (nms, nnfs, nrenames) = globalMatchesChecker ms nfs renames
---         in ((Match fn pb nrhs (Just (BDecls ndecl))):nms, nnfs, nrenames)
---     _ -> let
---         (nms, nfs, nrs) = globalMatchesChecker ms fs rs
---         in (m:nms, nfs, nrs)
--- globalMatchesChecker (m:ms) fs rs = let
---         (nms, nfs, nrs) = globalMatchesChecker ms fs rs
---         in (m:nms, nfs, nrs)
-
--- localScopeChecker :: [Decl] -> [String] -> [(String, String)] -> ([Decl], [String], [(String, String)])
--- localScopeChecker [] fs rs = ([], fs, rs)
--- localScopeChecker ((TypeSig names ty):xs) fs rs = let
---     (nnames, nfs, nrs) = procNames names fs rs
---     (ndecl, nnfs, renames) = localScopeChecker xs nfs nrs
---     in ((TypeSig nnames ty):ndecl, nnfs, renames)
--- localScopeChecker ((FunBind matches):xs) fs rs = let 
---     (m, nfs, renames) = localMatchesChecker matches fs rs
---     (decl, nnfs, nrenames) = localScopeChecker xs nfs (nub (rs ++ renames))
---     in ((FunBind m) : decl, nnfs, nrenames)
--- localScopeChecker ((PatBind fn rhs (Just (BDecls binds))):xs) fs rs = let 
---     (nrhs, nbinds, nfs, renames) = localPatChecker rhs binds fs rs
---     (decl, nnfs, nrenames) = localScopeChecker xs nfs (nub (rs ++ renames))
---     in ((PatBind fn nrhs (Just (BDecls nbinds))) : decl, nnfs, nrenames)
--- localScopeChecker (x:xs) fs rs = localScopeChecker xs fs rs
-
--- procNames :: [Name] -> [String] -> [(String, String)] -> ([Name], [String], [(String, String)])
--- procNames [] fs rs = ([], fs, rs)
--- procNames (n:ns) fs rs
---     | elem (getName n) fs = let
---             (nns, nfs, nrs) = procNames ns fs (rename (getName n):rs)
---             in ((setName n ('.' : getName n)):nns, nfs, nrs)
---     | otherwise = let
---         (nns, nfs, nrs) = procNames ns (getName n : fs) rs
---         in (n:nns, nfs, nrs)
-
--- localPatChecker :: Rhs -> [Decl] -> [String] -> [(String, String)] -> (Rhs, [Decl], [String], [(String, String)])
--- localPatChecker r d fs rs = let
---     (nd, nfs, nrs) = localScopeChecker d fs rs
---     nr = rhsChecker r nrs
---     in (nr, nd, nfs, nrs)
-
--- localMatchesChecker :: [Match] -> [String] -> [(String, String)] -> ([Match], [String], [(String, String)])
--- localMatchesChecker [] fs rs = ([], fs, rs)
--- localMatchesChecker (m@(Match fn pb rhs binds):ms) fs rs
---     | elem (getName fn) fs = case binds of
---         Just (BDecls decl) -> let 
---             (ndecl, nfs, renames) = localScopeChecker decl (getName fn : fs) (rename (getName fn):rs)
---             nrhs = rhsChecker rhs renames
---             (nms, nnfs, nrenames) = localMatchesChecker ms nfs renames
---             in ((Match (setName fn ('.' : getName fn)) pb nrhs (Just (BDecls ndecl))):nms, nnfs, nrenames)
---         _ -> let
---             (nms, nfs, nrs) = localMatchesChecker ms (getName fn : fs) (rename (getName fn):rs)
---             in ((Match (setName fn ('.' : getName fn)) pb rhs binds):nms, nfs, nrs)
---     | otherwise = case binds of
---         Just (BDecls decl) -> let 
---             (ndecl, nfs, renames) = localScopeChecker decl (getName fn : fs) rs
---             nrhs = rhsChecker rhs renames
---             (nms, nnfs, nrenames) = localMatchesChecker ms nfs renames
---             in ((Match fn pb nrhs (Just (BDecls ndecl))):nms, nnfs, nrenames)
---         _ -> let
---             (nms, nfs, nrs) = localMatchesChecker ms (getName fn : fs) rs
---             in (m:nms, nfs, nrs)
--- localMatchesChecker (m:ms) fs rs = let
---         (nms, nfs, nrs) = localMatchesChecker ms fs rs
---         in (m:nms, nfs, nrs)
 
 rhsChecker :: Rhs -> [(String, String)] -> Rhs
 rhsChecker (UnGuardedRhs exp) rs = UnGuardedRhs $ procExp exp rs
@@ -513,27 +428,14 @@ findRoots dict = filtered where
 
 merge :: [(Function, [Function])] -> CallGraph
 merge dict
-    | null roots = error "circle in code"
+    | null roots = error "circle in whole code"
     | null (drop 1 roots) = head $ map snd $ filter (\ (f, g) -> elem f roots) graphs
     | not (null roots) = Vertex (F "dummy" "" False) $ HS.fromList $ map snd $ filter (\ (f, g) -> elem f roots) graphs where
-    roots = findRoots dict
-    graphs = map (\ (f, fs) -> (f, genGraph dict [] (f, fs))) dict
+        roots = findRoots dict
+        graphs = map (\ (f, fs) -> (f, genGraph dict [] (f, fs))) dict
 
 wholeCodeGraph :: [Decl] -> CallGraph
 wholeCodeGraph decl = merge dict where
     pdecl = prep decl
     d = functionCalls (parseInFile pdecl) (parseInFile pdecl ++ map toFun preludeFuns) pdecl
     dict = flagRecursion (findRec d) d
-
--- showTuples [] = ""
--- showTuples ((a,b):xs) = show a ++ ('\n' : '\t' : show b) ++ ('\n' : showTuples xs)
-
--- f path = do
---     x <- parseFile path
---     case x of
---         ParseOk (Module _ _ _ decl) -> do
---             let 
---                 pdecl = prep decl
---                 d = functionCalls (parseInFile pdecl) (parseInFile pdecl ++ map toFun preludeFuns) pdecl
---                 dict = flagRecursion (findRec d) d
---                 in putStrLn $ showTuples dict

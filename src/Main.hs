@@ -7,7 +7,6 @@ import Graph
 import Algorithm
 import Language.Haskell.Exts.Simple
 import System.FilePath
-import Control.Concurrent.Async
 import Control.Parallel.Strategies
 import Data.List
 
@@ -35,32 +34,39 @@ oneTimeRunner = do
     case fs of
         [] -> do
             codes' <- parseAllCodes' paths
-            resps' <- runParallel codes'
             putStrLn "Whole codes:"
-            putStrLn $ writeRes resps' 1
+            putStrLn $ writeResAll (runOnAll codes') 1
         _ -> do
             codes <- parseAllCodes paths fs
             codes' <- parseAllCodes' paths
             resps <- runParallel codes
-            resps' <- runParallel codes'
             putStrLn "Result of functions:"
-            putStrLn $ writeRes resps 1
+            putStrLn $ writeRes resps 1 fs
             putStrLn "Whole codes:"
-            putStrLn $ writeRes resps' 1
+            putStrLn $ writeResAll (runOnAll codes') 1
 
+writeRes :: [Response] -> Int -> [FunName] -> String
+writeRes [] _ _ = ""
+writeRes (x:xs) n fs = writeResH x n fs ++ "\n" ++ writeRes xs (n + 1) fs where
+    writeResH :: Response -> Int -> [FunName] -> String
+    writeResH (id1, id2, matches) i fs = show i ++ ". " ++ show id1 ++ " <-> \n" ++ show id2 ++ ":\n" ++ showMatches matches fs where
+        showMatches :: [(String, MatchNum)] -> [FunName] -> String
+        showMatches [] _ = ""
+        showMatches _ [] = ""
+        showMatches resps (x:xs)
+            | Just num <- lookup x resps = '\t' : x ++ ": " ++ show num ++ "%\n" ++ showMatches resps xs
+            | otherwise = showMatches resps xs
 
-
-writeRes :: [Response] -> Int -> String
-writeRes [] _ = ""
-writeRes (x:xs) n = writeResH x n ++ "\n" ++ writeRes xs (n + 1) where
+writeResAll :: [Response] -> Int -> String
+writeResAll [] _ = ""
+writeResAll (x:xs) n = writeResH x n ++ "\n" ++ writeResAll xs (n + 1) where
+    writeResH :: Response -> Int -> String
     writeResH (id1, id2, matches) i = show i ++ ". " ++ show id1 ++ " <-> \n" ++ show id2 ++ ":\n" ++ showMatches matches where
+        showMatches :: [(String, MatchNum)] -> String
         showMatches [] = ""
-        showMatches ((fn, num):xs) = '\t' : fn ++ ": " ++ show num ++ "%\n" ++ showMatches xs
+        showMatches ((f, num):xs) = '\t' : "match" ++ ": " ++ show num ++ "%\n" ++ showMatches xs
 
 type FunName = String
-
-runAllAsync :: [Code] -> IO [Response]
-runAllAsync = mapConcurrently runAlg . makePairs
 
 runParallel :: [Code] -> IO [Response]
 runParallel = sequence . parMap rpar runAlg . makePairs

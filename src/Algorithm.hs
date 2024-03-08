@@ -59,7 +59,7 @@ neighF (F fn ft fr) (F gn gt gr)
     | otherwise = []
 
 cost :: CallGraph -> CallGraph -> Int -- cost of getting from graph g to graph h
-cost g@(Vertex gf gs) h@(Vertex hf hs) = costF gf hf + sum (map (uncurry cost) zipped) + sum (map (uncurry cost) matched) + 10 * length ngs + 10 * length nhs where
+cost g@(Vertex gf gs) h@(Vertex hf hs) = costF gf hf + sum (map (uncurry cost) zipped) + sum (map (uncurry cost) matched) + sum (map costLen ngs) + sum (map costLen nhs) where
         zipped = zipOn (HS.toList gs) (HS.toList hs)
         gsz = HS.toList $ HS.filter (\ g -> not $ elem g (map fst zipped)) gs
         hsz = HS.toList $ HS.filter (\ h -> not $ elem h (map snd zipped)) hs
@@ -78,6 +78,11 @@ cost g@(Vertex gf gs) h@(Vertex hf hs) = costF gf hf + sum (map (uncurry cost) z
             | otherwise = let
                 (matched, ngs, nhs) = magic xs ys
                 in (matched, (fv:ngs), nhs)
+
+costLen :: CallGraph -> Int
+costLen (Vertex _ fs)
+    | HS.null fs = 10
+    | otherwise = 10 + sum (map costLen $ HS.toList fs)
 
 costF :: Function -> Function -> Int
 costF (F fn ft fr) (F gn gt gr)
