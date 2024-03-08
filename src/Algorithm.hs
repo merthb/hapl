@@ -1,15 +1,40 @@
+{-# language TemplateHaskell, MagicHash #-}
+--{-# options_ghc -package-id ghc-prim #-}
 module Algorithm where
 
 import Graph
 import Data.Graph.AStar
 import Data.List
+import Data.Hashable
 import qualified Data.HashSet as HS
+import qualified Data.HashMap.Internal as HM
+import qualified Data.HashMap.Internal.Array as HA
+import qualified GHC.Prim as Prim
+import Data.Function.Memoize
 
 type ID = String
 type Code = (ID, [CallGraph]) -- each graph gets a unique id so that the results will be matched to the right codes
 
 type MatchNum = Int
 type Response = (ID, ID, [(String, MatchNum)])
+
+instance Memoizable Function where
+  memoize = $(deriveMemoize ''Function)
+
+instance (Memoizable a, Hashable a) => Memoizable (HM.HashMap a () ) where
+  memoize f a = memoize ( f . HM.fromList) $ HM.toList a
+
+instance Memoizable a => Memoizable (HM.Leaf a () ) where
+  memoize = $(deriveMemoize ''HM.Leaf)
+
+instance Memoizable a => Memoizable (HA.Array a ) where
+  memoize f a = memoize (\ls -> f $ HA.fromList (HA.length a) ls) $ HA.toList a 
+
+instance (Memoizable a, Hashable a) => Memoizable (HS.HashSet a) where
+  memoize = $(deriveMemoize ''HS.HashSet) 
+
+instance Memoizable (Graph Function) where
+  memoize = $(deriveMemoize ''Graph)
 
 heuristic :: CallGraph -> CallGraph -> CallGraph -> Int -- h(n) = cost_of_subst * min(RG, RH) + cost_of_insdel * abs(RG - RH)
 heuristic startg goalg g = min rgn rhn + abs (rgn - rhn) where 
@@ -58,8 +83,10 @@ neighF (F fn ft fr) (F gn gt gr)
     | fn /= gn = [F fn gt gr]
     | otherwise = []
 
-cost :: CallGraph -> CallGraph -> Int -- cost of getting from graph g to graph h
-cost g@(Vertex gf gs) h@(Vertex hf hs) = costF gf hf + sum (map (uncurry cost) zipped) + sum (map (uncurry cost) matched) + sum (map costLen ngs) + sum (map costLen nhs) where
+cost = memoize2 cost'
+
+cost' :: CallGraph -> CallGraph -> Int -- cost of getting from graph g to graph h
+cost' g@(Vertex gf gs) h@(Vertex hf hs) = costF gf hf + sum (map (uncurry cost) zipped) + sum (map (uncurry cost) matched) + sum (map costLen ngs) + sum (map costLen nhs) where
         zipped = zipOn (HS.toList gs) (HS.toList hs)
         gsz = HS.toList $ HS.filter (\ g -> not $ elem g (map fst zipped)) gs
         hsz = HS.toList $ HS.filter (\ h -> not $ elem h (map snd zipped)) hs
