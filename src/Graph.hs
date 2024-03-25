@@ -105,8 +105,20 @@ prep' xs
 doPrep :: [(String, String)] -> [Decl] -> [Decl]
 doPrep [] decl = decl
 doPrep (rs@(f,nf):xs) decl = case getGlobalDecl f decl of
-    Just d -> doPrep xs $ map (\ x -> if x == d then head (renameInDecl [d] [rs]) else x) decl
+    Just d -> doPrep xs $ map (\ x -> if x == d then renameFirst d rs else x) decl
     _ -> doPrep xs decl
+
+renameFirst :: Decl -> (String, String) -> Decl
+renameFirst (FunBind matches) rn = FunBind $ rnFirstMatch matches rn where
+    rnFirstMatch :: [Match] -> (String, String) -> [Match]
+    rnFirstMatch [] _ = []
+    rnFirstMatch (m@(Match vfn patts rhs (Just (BDecls decl))):ms) rn@(fn, nfn)
+        | findLocalScope fn decl = (Match vfn patts (rhsChecker rhs [rn]) (Just (BDecls $ renameInDecl decl [rn]))) : ms
+        | otherwise = m : rnFirstMatch ms rn
+    rnFirstMatch (m:ms) rn = m : rnFirstMatch ms rn
+renameFirst (p@(PatBind vfn rhs (Just (BDecls decl)))) rn@(fn, nfn)
+    | findLocalScope fn decl = PatBind vfn (rhsChecker rhs [rn]) (Just (BDecls $ renameInDecl decl [rn]))
+    | otherwise = p
 
 whatToRename :: [Function] -> [(String, String)]
 whatToRename xs = concatMap (\ xs -> map (\ (F fn ft fr) -> rename fn) (drop 1 xs)) $ filter (\ as -> case as of [] -> False; [x] -> False; _ -> True) $ groupBy (\ (F fn _ _) (F gn _ _) -> fn == gn) $ sortBy (\ (F fn _ _) (F gn _ _) -> compare fn gn) xs
