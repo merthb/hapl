@@ -32,12 +32,12 @@ executable hapl
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends:    
-        base ^>=4.16.1.0,
+        base,
         haskell-src-exts-simple,
         filepath,
         astar,
         hashable,
-        unordered-containers ^>=0.2.7.1,
+        unordered-containers,
         async,
         parallel,
         directory

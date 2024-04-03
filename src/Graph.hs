@@ -83,6 +83,11 @@ setName name n = case name of Ident xs -> Ident n; Symbol xs -> Symbol n
 
 ---------------- preprocess code files ---------------------------
 
+f path = do
+    x <- parseFile path
+    case x of 
+        ParseOk (Module _ _ _ decl) -> putStrLn $ show $ prep decl
+
 allDifferent :: [Function] -> Bool
 allDifferent [] = True
 allDifferent (x:xs) 
@@ -127,12 +132,14 @@ findLocalScope :: String -> [Decl] -> Bool
 findLocalScope f [] = False
 findLocalScope fn (t@(TypeSig names ty):ds) = elem fn (map getName names) || findLocalScope fn ds
 findLocalScope f (m@(FunBind matches):ds) = inLocals f matches || findLocalScope f ds
+findLocalScope f ((PatBind (PVar fn) _ (Just (BDecls decl))):ds) = f == getName fn || findLocalScope f decl || findLocalScope f ds
 findLocalScope f ((PatBind _ _ (Just (BDecls decl))):ds) = findLocalScope f decl || findLocalScope f ds
 findLocalScope f (d:ds) = findLocalScope f ds
 
 inLocals :: String -> [Match] -> Bool
 inLocals _ [] = False
-inLocals f ((Match _ _ _ (Just (BDecls decl))):ms) = findLocalScope f decl || inLocals f ms
+inLocals f ((Match fn _ _ (Just (BDecls decl))):ms) = f == getName fn || findLocalScope f decl || inLocals f ms
+inLocals f ((Match fn _ _ _):ms) = f == getName fn || inLocals f ms
 inLocals f (m:ms) = inLocals f ms
 
 getGlobalDecl :: String -> [Decl] -> Maybe Decl
