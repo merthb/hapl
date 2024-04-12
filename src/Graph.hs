@@ -12,9 +12,12 @@ data Graph a = Vertex {node :: a, edges :: HS.HashSet (Graph a)}
     deriving (Eq, Ord)
 
 instance Show a => Show (Graph a) where
-    show (Vertex node edges) = case HS.null edges of
+    show v@(Vertex node edges) = case HS.null edges of
         True -> show node
-        False -> show node ++ " => " ++ show edges
+        False -> myShow v 1
+
+myShow :: Show a => Graph a -> Int -> String
+myShow (Vertex node edges) tabnum = show node ++ " => \n" ++ replicate tabnum '\t' ++ (drop (2 + tabnum) $ concatMap (((",\n" ++ replicate tabnum '\t') ++) . (flip myShow (tabnum + 1))) edges)
 
 instance (Hashable a) => Hashable (Graph a) where
     hashWithSalt salt (Vertex val children) = hashWithSalt (hashWithSalt salt val) childrenHash where
@@ -86,7 +89,11 @@ setName name n = case name of Ident xs -> Ident n; Symbol xs -> Symbol n
 f path = do
     x <- parseFile path
     case x of 
-        ParseOk (Module _ _ _ decl) -> putStrLn $ show $ getCallGraphs (map (\ (F fn _ _) -> fn) $ parseInFile decl) decl
+        ParseOk (Module _ _ _ decl) -> do
+            -- putStrLn $ show $ prep decl
+            -- putStrLn $ show $ parseInFile $ prep decl
+            -- putStrLn $ show $ functionCalls (parseInFile $ prep decl) (parseInFile (prep decl) ++ map toFun preludeFuns) $ prep decl
+            putStrLn $ show $ wholeCodeGraph decl
 
 allDifferent :: [Function] -> Bool
 allDifferent [] = True
@@ -97,8 +104,7 @@ allDifferent (x:xs)
         myelem (F fn _ _) fs = not $ null $ filter (\ (F gn _ _) -> fn == gn) fs
 
 prep :: [Decl] -> [Decl]
-prep xs = prep' $ preprocFunBinds nxs $ map (\ (F n _ _) -> n) $ parseInFile nxs where
-    nxs = renameGlobals xs $ globalScopeFuns xs
+prep xs = prep' $ preprocFunBinds xs $ map (\ (F n _ _) -> n) $ parseInFile xs
 
 prep' :: [Decl] -> [Decl]
 prep' xs
@@ -157,7 +163,6 @@ findLocalScope :: String -> [Decl] -> Bool
 findLocalScope f [] = False
 findLocalScope fn (t@(TypeSig names ty):ds) = elem fn (map getName names) || findLocalScope fn ds
 findLocalScope f (m@(FunBind matches):ds) = inLocals f matches || findLocalScope f ds
-findLocalScope f ((PatBind (PVar fn) _ (Just (BDecls decl))):ds) = f == getName fn || findLocalScope f decl || findLocalScope f ds
 findLocalScope f ((PatBind _ _ (Just (BDecls decl))):ds) = findLocalScope f decl || findLocalScope f ds
 findLocalScope f (d:ds) = findLocalScope f ds
 
@@ -185,7 +190,15 @@ preprocFunBinds (f@(FunBind (m@(Match fn patts _ _):ms)):xs) fs
         createTypeSig :: [Pat] -> [Char] -> [Char]
         createTypeSig [] (a:as) = [a]
         createTypeSig (_:xs) (a:as) = a : createTypeSig xs as
+-- preprocFunBinds (p@(PatBind (PVar fn) _ _):xs) fs
+--     | not $ elem (getName fn) fs = (TypeSig [fn] (toType $ "a")) : p : preprocFunBinds xs fs
+--     | otherwise = p : preprocFunBinds xs fs
 preprocFunBinds (x:xs) fs = x : preprocFunBinds xs fs
+
+-- preprocGlobalPatBinds :: [Decl] -> [Decl]
+-- preprocGlobalPatBinds [] = []
+-- preprocGlobalPatBinds (p@(PatBind (PVar fn) _ _):ds) = TypeSig [fn] (toType "a") : p : preprocGlobalPatBinds ds
+-- preprocGlobalPatBinds (d:ds) = d : preprocGlobalPatBinds ds
 
 recheckMatches :: [Match] -> [String] -> [Match]
 recheckMatches [] _ = []
@@ -194,19 +207,6 @@ recheckMatches (x:xs) fs = x : recheckMatches xs fs
 
 rename :: String -> (String, String)
 rename xs = (xs, '.':xs)
-
-renameGlobals :: [Decl] -> [String] -> [Decl]
-renameGlobals [] _ = []
-renameGlobals ((FunBind matches):xs) fs = (FunBind $ matchRn matches (map rename fs)) : renameGlobals xs ((\ (Match fn _ _ _) -> getName fn) (head matches):fs) where
-    matchRn :: [Match] -> [(String, String)] -> [Match]
-    matchRn [] _ = []
-    matchRn ((Match fn pb rhs binds):ms) ffs = Match (setName fn ('.':getName fn)) pb (rhsChecker rhs ffs) (bindsChecker binds ffs) : matchRn ms ffs
-    matchRn (m:ms) ffs = m : matchRn ms ffs
-renameGlobals ((TypeSig fns ty):xs) fs = TypeSig (rnNames fns) ty : renameGlobals xs fs where
-    rnNames :: [Name] -> [Name]
-    rnNames [] = []
-    rnNames (x:xs) = setName x ('.':getName x) : rnNames xs
-renameGlobals (x:xs) fs = x : renameGlobals xs fs
 
 bindsChecker :: Maybe Binds -> [(String, String)] -> Maybe Binds
 bindsChecker (Just (BDecls d)) fs = Just $ BDecls $ renameInDecl d fs
