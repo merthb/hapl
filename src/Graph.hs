@@ -94,6 +94,7 @@ f path = do
             -- putStrLn $ show $ parseInFile $ prep decl
             -- putStrLn $ show $ functionCalls (parseInFile $ prep decl) (parseInFile (prep decl) ++ map toFun preludeFuns) $ prep decl
             putStrLn $ show $ wholeCodeGraph decl
+            -- putStrLn $ show $ getGlobalDecl "seged" decl decl
 
 allDifferent :: [Function] -> Bool
 allDifferent [] = True
@@ -115,7 +116,7 @@ prep' xs
 
 doPrep :: [(String, String)] -> [Decl] -> [Decl]
 doPrep [] decl = decl
-doPrep (rs@(f,nf):xs) decl = case getGlobalDecl f decl of
+doPrep (rs@(f,nf):xs) decl = case getGlobalDecl f decl decl of
     Just d -> doPrep xs $ map (\ x -> if x == d then renameFirst d rs else x) decl
     _ -> doPrep xs decl
 
@@ -125,16 +126,16 @@ renameFirst (FunBind matches) rn = FunBind $ iteMatches matches rn where
     iteMatches [] _ = []
     iteMatches (m@(Match fn patts rhs (Just (BDecls decl))):ms) rn@(f, nf)
         | findTypeSigScope decl f = Match fn patts (rhsChecker rhs [rn]) (Just $ BDecls $ renameInDecl decl [rn]) : ms
-        | findLocalScope f decl = Match fn patts (rhsChecker rhs [rn]) (Just $ BDecls $ doFirst decl rn) : ms
+        | any (inDecl f) decl = Match fn patts (rhsChecker rhs [rn]) (Just $ BDecls $ doFirst decl rn) : ms
         | otherwise = m : iteMatches ms rn
     iteMatches (m:ms) rn = m : iteMatches ms rn
 renameFirst (PatBind fn rhs (Just (BDecls decl))) rn@(f, nf)
     | findTypeSigScope decl f = PatBind fn (rhsChecker rhs [rn]) (Just $ BDecls $ renameInDecl decl [rn])
-    | findLocalScope f decl = PatBind fn (rhsChecker rhs [rn]) (Just $ BDecls $ doFirst decl rn)
+    | any (inDecl f) decl = PatBind fn (rhsChecker rhs [rn]) (Just $ BDecls $ doFirst decl rn)
 renameFirst x _ = x
 
 doFirst :: [Decl] -> (String, String) -> [Decl]
-doFirst decls rn@(fn, nfn) = case getGlobalDecl fn decls of
+doFirst decls rn@(fn, nfn) = case getGlobalDecl fn decls decls of
     Just d -> updateDecl decls d $ renameFirst d rn
     Nothing -> decls
 
@@ -142,13 +143,6 @@ findTypeSigScope :: [Decl] -> String -> Bool
 findTypeSigScope [] _ = False
 findTypeSigScope ((TypeSig names ty):xs) fn = any (\ n -> getName n == fn) names || findTypeSigScope xs fn
 findTypeSigScope (x:xs) fn = findTypeSigScope xs fn
-
-rnMatches :: [Match] -> (String, String) -> [Match]
-rnMatches [] _ = []
-rnMatches (m@(Match mfn pb rhs binds):ms) rn@(fn, nfn)
-    | fn == getName mfn = Match (setName mfn nfn) pb (rhsChecker rhs [rn]) (bindsChecker binds [rn]) : rnMatches ms rn
-    | otherwise = m : rnMatches ms rn
-rnMatches (m:ms) rn = m : rnMatches ms rn
 
 updateDecl :: [Decl] -> Decl -> Decl -> [Decl]
 updateDecl [] _ _ = []
@@ -159,28 +153,30 @@ updateDecl (x:xs) d nd
 whatToRename :: [Function] -> [(String, String)]
 whatToRename xs = concatMap (\ xs -> map (\ (F fn ft fr) -> rename fn) (drop 1 xs)) $ filter (\ as -> case as of [] -> False; [x] -> False; _ -> True) $ groupBy (\ (F fn _ _) (F gn _ _) -> fn == gn) $ sortBy (\ (F fn _ _) (F gn _ _) -> compare fn gn) xs
 
-findLocalScope :: String -> [Decl] -> Bool
-findLocalScope f [] = False
-findLocalScope fn (t@(TypeSig names ty):ds) = elem fn (map getName names) || findLocalScope fn ds
-findLocalScope f (m@(FunBind matches):ds) = inLocals f matches || findLocalScope f ds
-findLocalScope f ((PatBind _ _ (Just (BDecls decl))):ds) = findLocalScope f decl || findLocalScope f ds
-findLocalScope f (d:ds) = findLocalScope f ds
+getGlobalDecl :: String -> [Decl] -> [Decl] -> Maybe Decl
+getGlobalDecl _ [] _ = Nothing
+getGlobalDecl f (d:ds) oldds
+    | inDecl f d && notTypeSigOrThatFunBind f d = Just d
+    | otherwise = getGlobalDecl f ds oldds
 
-inLocals :: String -> [Match] -> Bool
-inLocals _ [] = False
-inLocals f ((Match fn _ _ (Just (BDecls decl))):ms) = f == getName fn || findLocalScope f decl || inLocals f ms
-inLocals f ((Match fn _ _ _):ms) = f == getName fn || inLocals f ms
-inLocals f (m:ms) = inLocals f ms
+notTypeSigOrThatFunBind :: String -> Decl -> Bool
+notTypeSigOrThatFunBind _ (TypeSig _ _) = False
+notTypeSigOrThatFunBind f (FunBind (m:ms)) = not $ getFunName m == f where
+    getFunName :: Match -> String
+    getFunName (Match fn _ _ _) = getName fn
+notTypeSigOrThatFunBind _ _ = True
 
-getGlobalDecl :: String -> [Decl] -> Maybe Decl
-getGlobalDecl _ [] = Nothing
-getGlobalDecl f (b@(FunBind matches):ds)
-    | findLocalScope f (foldr (\ m neut -> case m of (Match _ _ _ (Just (BDecls d))) -> d ++ neut; _ -> neut) [] matches) = Just b
-    | otherwise = getGlobalDecl f ds
-getGlobalDecl f (p@(PatBind _ _ (Just (BDecls decl))):ds)
-    | findLocalScope f decl = Just p
-    | otherwise = getGlobalDecl f ds
-getGlobalDecl f (d:ds) = getGlobalDecl f ds
+inDecl :: String -> Decl -> Bool
+inDecl f (TypeSig names _) = elem f (map getName names)
+inDecl f (FunBind matches) = inMatches matches f where
+    inMatches :: [Match] -> String -> Bool
+    inMatches [] _ = False
+    inMatches ((Match fn _ _ (Just (BDecls decl))):ms) f = getName fn == f || any (inDecl f) decl || inMatches ms f
+    inMatches ((Match fn _ _ _):ms) f = getName fn == f || inMatches ms f
+    inMatches (m:ms) f = inMatches ms f
+inDecl f (PatBind (PVar fn) _ (Just (BDecls decl))) = getName fn == f || any (inDecl f) decl
+inDecl f (PatBind (PVar fn) _ _) = getName fn == f
+inDecl _ _ = False
 
 preprocFunBinds :: [Decl] -> [String] -> [Decl]
 preprocFunBinds [] _ = []
@@ -190,9 +186,6 @@ preprocFunBinds (f@(FunBind (m@(Match fn patts _ _):ms)):xs) fs
         createTypeSig :: [Pat] -> [Char] -> [Char]
         createTypeSig [] (a:as) = [a]
         createTypeSig (_:xs) (a:as) = a : createTypeSig xs as
--- preprocFunBinds (p@(PatBind (PVar fn) _ _):xs) fs
---     | not $ elem (getName fn) fs = (TypeSig [fn] (toType $ "a")) : p : preprocFunBinds xs fs
---     | otherwise = p : preprocFunBinds xs fs
 preprocFunBinds (x:xs) fs = x : preprocFunBinds xs fs
 
 -- preprocGlobalPatBinds :: [Decl] -> [Decl]
