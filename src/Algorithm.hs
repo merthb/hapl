@@ -32,7 +32,7 @@ neighbors goalg@(Vertex f fs) curr@(Vertex g gs)
     | fg && nd1 = HS.map (\ f -> insertEdge curr f) diff1
     | fg && nd2 = HS.map (\ g -> deleteEdge curr g) diff2
     | fg = foldr HS.union HS.empty (map (\ (fx, gx) -> HS.map (\ h -> (Vertex g $ HS.map (\ y -> if y == gx then h else y) gs)) $ neighbors fx gx) $ zipOn (HS.toList fs) (HS.toList gs))
-    | otherwise = HS.fromList $ map (\ f -> (Vertex f gs)) $ neighF f g where
+    | otherwise = HS.fromList [(\ f -> (Vertex f gs)) f] where
         fg = f == g
         diff1 = HS.filter (\ (Vertex x _) -> HS.null (HS.filter (\ y -> startsWith x y) gs)) fs
         diff2 = HS.filter (\ (Vertex x _) -> HS.null (HS.filter (\ y -> startsWith x y) fs)) gs
@@ -43,20 +43,20 @@ neighbors goalg@(Vertex f fs) curr@(Vertex g gs)
         magic [] _ _ _ = HS.empty
         magic _ [] _ _ = HS.empty
         magic (fv@(Vertex f@(F fn ft fr) fs):xs) ys hs h
-            | Just (Vertex v@(F vn vt vr) vs) <- find (\ (Vertex g@(F _ gt _) _) -> gt == ft) ys = HS.union (HS.fromList $ map (\ x -> Vertex h $ HS.map (\ y -> if y == fv then Vertex x fs else y) hs) $ neighF v f) (magic xs ys hs h)
-            | Just (Vertex v@(F vn vt vr) vs) <- find (\ (Vertex g@(F gn _ _) _) -> gn == fn) ys = HS.union (HS.fromList $ map (\ x -> Vertex h $ HS.map (\ y -> if y == fv then Vertex x fs else y) hs) $ neighF v f) (magic xs ys hs h)
+            | Just (Vertex v@(F vn vt vr) vs) <- find (\ (Vertex g@(F _ gt _) _) -> gt == ft) ys = HS.insert ((\ x -> Vertex h $ HS.map (\ y -> if y == fv then Vertex x fs else y) hs) v) (magic xs ys hs h)
+            | Just (Vertex v@(F vn vt vr) vs) <- find (\ (Vertex g@(F gn _ _) _) -> gn == fn) ys = HS.insert ((\ x -> Vertex h $ HS.map (\ y -> if y == fv then Vertex x fs else y) hs) v) (magic xs ys hs h)
             | otherwise = HS.insert (Vertex h $ HS.delete fv hs) $ magic xs ys hs h
 
-neighF :: Function -> Function -> [Function]
-neighF (F fn ft fr) (F gn gt gr)
-    | fn /= gn && ft /= gt && fr /= gr = [F fn gt gr, F gn ft gr, F gn gt fr]
-    | ft /= gt && fr /= gr = [F gn ft gr, F gn gt fr]
-    | fn /= gn && ft /= gt = [F fn gt gr, F gn ft gr]
-    | fn /= gn && fr /= gr = [F fn gt gr, F gn gt fr]
-    | ft /= gt = [F gn ft gr]
-    | fr /= gr = [F gn gt fr]
-    | fn /= gn = [F fn gt gr]
-    | otherwise = []
+-- neighF :: Function -> Function -> [Function]
+-- neighF (F fn ft fr) (F gn gt gr)
+--     | fn /= gn && ft /= gt && fr /= gr = [F fn gt gr, F gn ft gr, F gn gt fr]
+--     | ft /= gt && fr /= gr = [F gn ft gr, F gn gt fr]
+--     | fn /= gn && ft /= gt = [F fn gt gr, F gn ft gr]
+--     | fn /= gn && fr /= gr = [F fn gt gr, F gn gt fr]
+--     | ft /= gt = [F gn ft gr]
+--     | fr /= gr = [F gn gt fr]
+--     | fn /= gn = [F fn gt gr]
+--     | otherwise = []
 
 cost :: CallGraph -> CallGraph -> Int -- cost of getting from graph g to graph h
 cost g@(Vertex gf gs) h@(Vertex hf hs) = costF gf hf + sum (map (uncurry cost) zipped) + sum (map (uncurry cost) matched) + sum (map costLen ngs) + sum (map costLen nhs) where
