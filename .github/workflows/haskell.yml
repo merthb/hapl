@@ -63,6 +63,11 @@ jobs:
           - macos-latest
     runs-on: ${{ matrix.os }}
     steps:
+      - uses: haskell-actions/setup@v2 
+        id: cabal-setup
+        with:
+          ghc-version: '9.8.2'
+          cabal-version: '3.6.2.0'
       - name : Run Tests
         run: ${{steps.cabal-setup.outputs.cabal-exe}} test
   build:
@@ -77,7 +82,11 @@ jobs:
     needs: [test, prep]
 
     steps:
-    
+    - uses: haskell-actions/setup@v2 
+      id: cabal-setup
+      with:
+        ghc-version: '9.8.2'
+        cabal-version: '3.6.2.0'
     - name: Build
       run: cabal build hapl --ghc-options=-O2
     - name: Upload artifact
