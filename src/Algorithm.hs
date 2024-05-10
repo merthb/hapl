@@ -1,4 +1,4 @@
-module Algorithm (f,ID,Code,MatchNum,Response,heuristic,neighbors,cost,maxCost,similarityScore,mainAlgorithm,runOnAll,makePairs,zipOnFunName) where
+module Algorithm (ID,Code,MatchNum,Response,heuristic,neighbors,cost,maxCost,similarityScore,mainAlgorithm,runOnAll,makePairs,zipOnFunName) where
 
 import Graph
 import Data.Graph.AStar
@@ -148,12 +148,3 @@ zipOnFunName (vf@(Vertex (F fn fty _) _):fs) gs
     | Just vg <- find (\ (Vertex (F n ty _) _) -> fn == n && fty == ty) gs = (dropWhile (=='.') fn, vf, vg) : zipOnFunName fs gs
     | Just vg <- find (\ (Vertex (F n ty _) _) -> fn == n) gs = (dropWhile (=='.') fn, vf, vg) : zipOnFunName fs gs
     | otherwise = zipOnFunName fs gs
-
-f path1 path2 = do
-    x <- parseFile path1
-    y <- parseFile path2
-    case x of
-        ParseOk (Module _ _ _ declx) -> case y of
-            ParseOk (Module _ _ _ decly) -> putStrLn $ show $ mainAlgorithm (wholeCodeGraph declx) (wholeCodeGraph decly)
-            _ -> putStrLn "Test file couldn't be parsed, possibly syntax error in file."
-        _ -> putStrLn "Test file couldn't be parsed, possibly syntax error in file."
