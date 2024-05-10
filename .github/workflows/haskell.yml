@@ -11,6 +11,12 @@ permissions:
 
 jobs:
   prep:
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
     runs-on: ${{matrix.os}}
     steps:
       - uses: actions/checkout@v3
@@ -49,6 +55,12 @@ jobs:
           key: ${{ steps.cache.outputs.cache-primary-key }}
   test:
     needs: prep
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
     runs-on: ${{ matrix.os }}
     steps:
       - name : Run Tests
