@@ -56,8 +56,8 @@ jobs:
         path: ${{ steps.cabal-setup.outputs.cabal-store }}
         key: ${{ steps.cache.outputs.cache-primary-key }}
     - name : Run Tests
-      if: runner.os != 'windows'
-      run: cabal test
+      if: matrix.os != 'windows-latest'
+      run: \[  ${{ matrix.os }} -ne "windows-latest" \] && cabal test
     - name: Build
       run: cabal build hapl --ghc-options=-O2
     - name: Upload artifact
