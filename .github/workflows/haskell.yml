@@ -56,7 +56,7 @@ jobs:
         path: ${{ steps.cabal-setup.outputs.cabal-store }}
         key: ${{ steps.cache.outputs.cache-primary-key }}
     - name : Run Tests
-      if: ${{runner.os}} != windows-latest
+      if: runner.os != 'windows'
       run: cabal test
     - name: Build
       run: cabal build hapl --ghc-options=-O2
