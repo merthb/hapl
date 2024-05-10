@@ -37,7 +37,7 @@ jobs:
         env:
           key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
         with:
-          path: ${{ steps.setup.outputs.cabal-store }}
+          path: ${{ steps.cabal-setup.outputs.cabal-store }}
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
   
@@ -51,7 +51,7 @@ jobs:
         # If we had an exact cache hit, trying to save the cache would error because of key clash.
         if: steps.cache.outputs.cache-hit != 'true'
         with:
-          path: ${{ steps.setup.outputs.cabal-store }}
+          path: ${{ steps.cabal-setup.outputs.cabal-store }}
           key: ${{ steps.cache.outputs.cache-primary-key }}
   test:
     needs: prep
@@ -90,4 +90,4 @@ jobs:
           dist-newstyle/build/*/*/*/*/hapl/build/hapl/hapl
           dist-newstyle/build/*/*/*/*/hapl/build/hapl/hapl.exe
         # Duration after which artifact will expire in days.
-        retention-days: 100 # optional, default is 1
+        retention-days: 90 # optional, default is 1
