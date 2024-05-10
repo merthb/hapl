@@ -64,7 +64,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name : Run Tests
-        run: cabal test
+        run: ${{steps.cabal-setup.outputs.cabal-exe}} test
   build:
     strategy:
       matrix:
