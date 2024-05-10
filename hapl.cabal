@@ -9,7 +9,7 @@ homepage:
 
 -- A URL where users can report bugs.
 -- bug-reports:
-license:            MIT
+license:            LGPL-2.1-only
 license-file:       LICENSE
 author:             Merth Borbála
 maintainer:         borka.merth14@gmail.com
@@ -38,10 +38,33 @@ executable hapl
         astar,
         hashable,
         unordered-containers,
-        async,
         parallel,
-        directory
-        -- gi-gtk,
-        -- haskell-gi-base
+        directory,
+        HUnit,
+        algebraic-graphs
     hs-source-dirs:   src
     default-language: GHC2021
+
+Test-Suite test-hapl
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:
+        tests,
+        src
+  default-language:    GHC2021
+  main-is:             HAPL_tests.hs
+  other-modules:       
+        Graph, 
+        Algorithm,
+        Algorithm_tests,
+        Graph_tests
+  build-depends:
+        base,
+        haskell-src-exts-simple,
+        filepath,
+        astar,
+        hashable,
+        unordered-containers,
+        parallel,
+        directory,
+        HUnit,
+        algebraic-graphs
