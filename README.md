@@ -1,13 +1,7 @@
-# Haskell plagiarism detection
+# HAPL — Haskell Plágiumellenőrző szoftver
 
-The objective of this project is creating a software that is precise in plagiarism detection in Haskell codes. The project relies cardinally on the [paper of M. L. Kammer](https://www.macs.hw.ac.uk/~jh2054/downloads/marnixkammer-msc.pdf).
+## Rövid leírás
 
-## How to use it
+A szakdolgozat célja egy olyan plágiumellenőrző szoftver írása, amely Haskell programok háttérlogikája mentén ad egyezési százalékot. Ahhoz, hogy bármilyen program háttérlogikáját tudjuk vizsgálni, valamilyen módon el kell vonatkoztatni a szövegi síktól, és egy absztraktabb adatszerkezetben kell tekinteni a programra. [M. L. Kammer diplomamunkájában](https://webspace.science.uu.nl/~hage0101/downloads/marnixkammer-msc.pdf) erre függvényhívási gráfokat használt, így én is emellett döntöttem. 
 
-After running the code it needs a path to the file with the following infos:
-- In the first line we have to give the function names on which we want to run the algorithm (leave it empty, if you want to run the check on the whole code)
-- Then in each line we give the paths of the files which have to be matched
-
-## About the algorithm
-
-The program is based on call-graph matching, so firstly we have to construct the call-graph to each function we need to match in the codes, or the call-graph of the whole code. After that, we need to find the shortest path from one call-graph to another. The program uses A* search to get this shortest path, and then calculates the precentage of matching by finding all differences between the original graph and the graph the A* search gave back (the end of the shortest path).
+A szoftver tehát elsősorban minden ellenőrizni kívánt programhoz felépíti a függvényhívási gráfot — azaz összeszedi, hogy az egyes függvények mely másik függvényeket hívják meg, a függvények lesznek a csúcsai a gráfnak, és a függvényhívások az irányított élek egyik függvénytől a másikhoz —, majd megkeresi két így előállított gráf közt a legrövidebb utat A* algoritmus \cite{Astar} segítségével. Másképpen megfogalmazva részgráf egyezéseket keres, hiszen ahol a két gráf egyezik, azon szakaszokon az útnak költsége nincsen. Ezek után pedig megadja az egyezési százalékot a vélhető maximum költség és a talált legrövidebb út kölstégének különbsége által.
