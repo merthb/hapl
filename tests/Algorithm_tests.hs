@@ -74,7 +74,7 @@ heuristicTests = [
                 y <- parseFile path2
                 case x of
                     ParseOk (Module _ _ _ declx) -> case y of
-                        ParseOk (Module _ _ _ decly) -> assertEqual ("heuristic: " ++ path1 ++ ", " ++ path2) (heuristic (wholeCodeGraph declx) (wholeCodeGraph declx) (wholeCodeGraph decly)) value
+                        ParseOk (Module _ _ _ decly) -> assertEqual ("heuristic: " ++ path1 ++ ", " ++ path2) value (heuristic (wholeCodeGraph declx) (wholeCodeGraph declx) (wholeCodeGraph decly))
                         _ -> assertFailure "Test file couldn't be parsed, possibly syntax error in file."
                     _ -> assertFailure "Test file couldn't be parsed, possibly syntax error in file.")
 
@@ -132,7 +132,7 @@ neighborsTests = [
                 y <- parseFile path2
                 case x of
                     ParseOk (Module _ _ _ declx) -> case y of
-                        ParseOk (Module _ _ _ decly) -> assertEqual ("neighbors: " ++ path1 ++ ", " ++ path2) (neighbors (wholeCodeGraph declx) (wholeCodeGraph decly)) value
+                        ParseOk (Module _ _ _ decly) -> assertEqual ("neighbors: " ++ path1 ++ ", " ++ path2) value (neighbors (wholeCodeGraph declx) (wholeCodeGraph decly))
                         _ -> assertFailure "Test file couldn't be parsed, possibly syntax error in file."
                     _ -> assertFailure "Test file couldn't be parsed, possibly syntax error in file.")
 
@@ -190,7 +190,7 @@ costTests = [
                 y <- parseFile path2
                 case x of
                     ParseOk (Module _ _ _ declx) -> case y of
-                        ParseOk (Module _ _ _ decly) -> assertEqual ("cost: " ++ path1 ++ ", " ++ path2) (cost (wholeCodeGraph declx) (wholeCodeGraph decly)) value
+                        ParseOk (Module _ _ _ decly) -> assertEqual ("cost: " ++ path1 ++ ", " ++ path2) value (cost (wholeCodeGraph declx) (wholeCodeGraph decly))
                         _ -> assertFailure "Test file couldn't be parsed, possibly syntax error in file."
                     _ -> assertFailure "Test file couldn't be parsed, possibly syntax error in file.")
 
@@ -248,55 +248,55 @@ maxCostTests = [
                 y <- parseFile path2
                 case x of
                     ParseOk (Module _ _ _ declx) -> case y of
-                        ParseOk (Module _ _ _ decly) -> assertEqual ("cost: " ++ path1 ++ ", " ++ path2) (maxCost (wholeCodeGraph declx) (wholeCodeGraph decly)) value
+                        ParseOk (Module _ _ _ decly) -> assertEqual ("cost: " ++ path1 ++ ", " ++ path2) value (maxCost (wholeCodeGraph declx) (wholeCodeGraph decly))
                         _ -> assertFailure "Test file couldn't be parsed, possibly syntax error in file."
                     _ -> assertFailure "Test file couldn't be parsed, possibly syntax error in file.")
 
 mainAlgorithmTests :: [Test]
 mainAlgorithmTests = [
-        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test2.hs" 33),
-        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test3.hs" 49),
+        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test2.hs" 35),
+        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test3.hs" 50),
         (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test4.hs" 18),
-        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test5.hs" 32),
-        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test6.hs" 50),
-        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test7.hs" 26),
-        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test8.hs" 48),
-        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test9.hs" 44),
-        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test10.hs" 25),
-        (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test3.hs" 33),
+        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test5.hs" 34),
+        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test6.hs" 52),
+        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test7.hs" 28),
+        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test8.hs" 49),
+        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test9.hs" 45),
+        (testFileEqual "tests/test_files/test1.hs" "tests/test_files/test10.hs" 26),
+        (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test3.hs" 34),
         (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test4.hs" 11),
         (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test5.hs" 47),
-        (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test6.hs" 31),
+        (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test6.hs" 34),
         (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test7.hs" 35),
-        (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test8.hs" 36),
-        (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test9.hs" 33),
-        (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test10.hs" 24),
-        (testFileEqual "tests/test_files/test3.hs" "tests/test_files/test4.hs" 22),
-        (testFileEqual "tests/test_files/test3.hs" "tests/test_files/test5.hs" 32),
-        (testFileEqual "tests/test_files/test3.hs" "tests/test_files/test6.hs" 46),
+        (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test8.hs" 38),
+        (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test9.hs" 35),
+        (testFileEqual "tests/test_files/test2.hs" "tests/test_files/test10.hs" 25),
+        (testFileEqual "tests/test_files/test3.hs" "tests/test_files/test4.hs" 23),
+        (testFileEqual "tests/test_files/test3.hs" "tests/test_files/test5.hs" 33),
+        (testFileEqual "tests/test_files/test3.hs" "tests/test_files/test6.hs" 47),
         (testFileEqual "tests/test_files/test3.hs" "tests/test_files/test7.hs" 27),
-        (testFileEqual "tests/test_files/test3.hs" "tests/test_files/test8.hs" 47),
+        (testFileEqual "tests/test_files/test3.hs" "tests/test_files/test8.hs" 48),
         (testFileEqual "tests/test_files/test3.hs" "tests/test_files/test9.hs" 43),
         (testFileEqual "tests/test_files/test3.hs" "tests/test_files/test10.hs" 26),
         (testFileEqual "tests/test_files/test4.hs" "tests/test_files/test5.hs" 8),
-        (testFileEqual "tests/test_files/test4.hs" "tests/test_files/test6.hs" 18),
+        (testFileEqual "tests/test_files/test4.hs" "tests/test_files/test6.hs" 19),
         (testFileEqual "tests/test_files/test4.hs" "tests/test_files/test7.hs" 7),
-        (testFileEqual "tests/test_files/test4.hs" "tests/test_files/test8.hs" 29),
-        (testFileEqual "tests/test_files/test4.hs" "tests/test_files/test9.hs" 22),
+        (testFileEqual "tests/test_files/test4.hs" "tests/test_files/test8.hs" 30),
+        (testFileEqual "tests/test_files/test4.hs" "tests/test_files/test9.hs" 23),
         (testFileEqual "tests/test_files/test4.hs" "tests/test_files/test10.hs" 19),
-        (testFileEqual "tests/test_files/test5.hs" "tests/test_files/test6.hs" 30),
+        (testFileEqual "tests/test_files/test5.hs" "tests/test_files/test6.hs" 31),
         (testFileEqual "tests/test_files/test5.hs" "tests/test_files/test7.hs" 37),
-        (testFileEqual "tests/test_files/test5.hs" "tests/test_files/test8.hs" 35),
-        (testFileEqual "tests/test_files/test5.hs" "tests/test_files/test9.hs" 32),
-        (testFileEqual "tests/test_files/test5.hs" "tests/test_files/test10.hs" 23),
-        (testFileEqual "tests/test_files/test6.hs" "tests/test_files/test7.hs" 24),
-        (testFileEqual "tests/test_files/test6.hs" "tests/test_files/test8.hs" 48),
-        (testFileEqual "tests/test_files/test6.hs" "tests/test_files/test9.hs" 41),
-        (testFileEqual "tests/test_files/test6.hs" "tests/test_files/test10.hs" 24),
+        (testFileEqual "tests/test_files/test5.hs" "tests/test_files/test8.hs" 37),
+        (testFileEqual "tests/test_files/test5.hs" "tests/test_files/test9.hs" 36),
+        (testFileEqual "tests/test_files/test5.hs" "tests/test_files/test10.hs" 25),
+        (testFileEqual "tests/test_files/test6.hs" "tests/test_files/test7.hs" 25),
+        (testFileEqual "tests/test_files/test6.hs" "tests/test_files/test8.hs" 56),
+        (testFileEqual "tests/test_files/test6.hs" "tests/test_files/test9.hs" 43),
+        (testFileEqual "tests/test_files/test6.hs" "tests/test_files/test10.hs" 25),
         (testFileEqual "tests/test_files/test7.hs" "tests/test_files/test8.hs" 29),
         (testFileEqual "tests/test_files/test7.hs" "tests/test_files/test9.hs" 27),
         (testFileEqual "tests/test_files/test7.hs" "tests/test_files/test10.hs" 21),
-        (testFileEqual "tests/test_files/test8.hs" "tests/test_files/test9.hs" 49),
+        (testFileEqual "tests/test_files/test8.hs" "tests/test_files/test9.hs" 56),
         (testFileEqual "tests/test_files/test8.hs" "tests/test_files/test10.hs" 27),
         (testFileEqual "tests/test_files/test9.hs" "tests/test_files/test10.hs" 26)
     ] where
@@ -306,6 +306,6 @@ mainAlgorithmTests = [
                 y <- parseFile path2
                 case x of
                     ParseOk (Module _ _ _ declx) -> case y of
-                        ParseOk (Module _ _ _ decly) -> assertEqual ("main algorithm: " ++ path1 ++ ", " ++ path2) (mainAlgorithm (wholeCodeGraph declx) (wholeCodeGraph decly)) value
+                        ParseOk (Module _ _ _ decly) -> assertEqual ("main algorithm: " ++ path1 ++ ", " ++ path2) value (mainAlgorithm (wholeCodeGraph declx) (wholeCodeGraph decly))
                         _ -> assertFailure "Test file couldn't be parsed, possibly syntax error in file."
                     _ -> assertFailure "Test file couldn't be parsed, possibly syntax error in file.")

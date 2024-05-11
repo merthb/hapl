@@ -12,6 +12,8 @@ import Data.List
 import System.Environment
 import Control.Exception
 
+type FunName = String
+
 main :: IO ()
 main = do
     args <- getArgs
@@ -22,14 +24,14 @@ main = do
             putStrLn "A programok struktúráját vizsgálja, felépíti azok függvényhívási gráfját, majd részgráf egyezéseket keresve"
             putStrLn "adja meg az egyezési százalékot.\n"
             loop
-        (file:_) -> do
+        (file:[]) -> do
             b <- System.Directory.doesFileExist file
             case b of
                 True -> do
                     content <- readFile file
                     case (words $ head $ lines content) of
                         [] -> do
-                            codes' <- parseAllCodes' (filter System.FilePath.isValid $ tail $ lines content)
+                            codes' <- parseAllCodesAll (filter System.FilePath.isValid $ tail $ lines content)
                             putStrLn "Programok teljes gráfjainak egyezési százalékai:\n"
                             putStrLn $ writeResAll (runOnAll codes') 1
                         _ -> do
@@ -38,13 +40,23 @@ main = do
                             putStrLn "A függvényenként felépített gráfok egyezési százalékai:\n"
                             putStrLn $ writeRes resps 1 (words $ head $ lines content)
                             putStrLn ""
-                            codes' <- parseAllCodes' (filter System.FilePath.isValid $ tail $ lines content)
+                            codes' <- parseAllCodesAll (filter System.FilePath.isValid $ tail $ lines content)
                             resps' <- runParallel codes'
                             putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
                             putStrLn $ writeResAll resps' 1
+                            putStrLn "Nyomjon ENTER-t a kilépéshez!"
+                            x <- getLine
+                            exitSuccess
                 False -> do
                     putStrLn "Invalid paraméter: A megadott fájl nem létezik."
+                    putStrLn "Nyomjon ENTER-t a kilépéshez!"
+                    x <- getLine
                     exitFailure
+        _ -> do
+            putStrLn "Túl sok paraméter: A program csak az információkat tartalmazó fájl elérési útját várja paraméterül."
+            putStrLn "Nyomjon ENTER-t a kilépéshez!"
+            x <- getLine
+            exitFailure
 
 loop :: IO ()
 loop = do
@@ -69,7 +81,8 @@ getMenuItem = do
 
 oneTimeRunner :: IO ()
 oneTimeRunner = do
-    putStrLn "Az ellenőrzés futtatásához szükséges megadni egy szöveges fájl (.txt) elérési útját, amelyben az alábbi imformációk szerepelnek:"
+    putStrLn "Az ellenőrzés futtatásához szükséges megadni egy szöveges fájl (.txt) elérési útját,"
+    putStrLn "amelyben az alábbi imformációk szerepelnek:"
     putStrLn "* A fájl első sora tartalmazza a függvények nevét, amelyekre önálló ellenőrzést is futtatni kíván."
     putStrLn "  Amennyiben nem kíván önálló ellenőrzéseket is futtatni, úgy ezt a sort hagyja üresen."
     putStrLn "* A fájl második sorától kezdve minden sor egy ellenőrizni kívánt fájl elérési útja kell legyen.\n"
@@ -77,7 +90,7 @@ oneTimeRunner = do
     (fs, paths) <- filePathReader
     case fs of
         [] -> do
-            codes' <- parseAllCodes' paths
+            codes' <- parseAllCodesAll paths
             putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
             putStrLn $ writeResAll (runOnAll codes') 1
             putStrLn ""
@@ -87,7 +100,7 @@ oneTimeRunner = do
             putStrLn "\nA függvényenként felépített gráfok egyezési százalékai:\n"
             putStrLn $ writeRes resps 1 fs
             putStrLn ""
-            codes' <- parseAllCodes' paths
+            codes' <- parseAllCodesAll paths
             resps' <- runParallel codes'
             putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
             putStrLn $ writeResAll resps' 1
@@ -112,15 +125,13 @@ writeResAll (x:xs) n = writeResH x n ++ "\n" ++ writeResAll xs (n + 1) where
     writeResH (id1, id2, matches) i = show i ++ ". " ++ show id1 ++ " <->\n" ++ show id2 ++ ":\n" ++ showMatches matches where
         showMatches :: [(String, MatchNum)] -> String
         showMatches [] = ""
-        showMatches ((f, num):xs) = '\t' : "match" ++ ": " ++ show num ++ "%\n" ++ showMatches xs
-
-type FunName = String
-
-runParallel :: [Code] -> IO [Response]
-runParallel = sequence . parMap rpar runAlg . makePairs
+        showMatches ((f, num):xs) = '\t' : "egyezés: " ++ show num ++ "%\n" ++ showMatches xs
 
 catchAny :: IO a -> (SomeException -> IO a) -> IO a
 catchAny = Control.Exception.catch
+
+runParallel :: [Code] -> IO [Response]
+runParallel = sequence . parMap rpar runAlg . makePairs
 
 runAlg :: (Code, Code) -> IO Response
 runAlg ((id1, g), (id2, h)) = do
@@ -144,19 +155,19 @@ parseAllCodes (x:xs) fs = do
         Nothing -> pure cs
 
 -- whole code graph parser
-parseCode' :: FilePath -> IO (Maybe Code)
-parseCode' p = do
+parseCodeAll :: FilePath -> IO (Maybe Code)
+parseCodeAll p = do
     x <- parseFile p
     case x of
         ParseOk (Module _ _ _ d) -> pure $ Just (p, [wholeCodeGraph d])
         _ -> pure Nothing
 
 -- whole code graph parser
-parseAllCodes' :: [FilePath] -> IO [Code]
-parseAllCodes' [] = pure []
-parseAllCodes' (x:xs) = do
-    code <- catchAny (parseCode' x) $ \e -> do putStrLn (x ++ ": fájl beolvasása sikertelen, a program nem kezeli."); pure Nothing
-    cs <- parseAllCodes' xs
+parseAllCodesAll :: [FilePath] -> IO [Code]
+parseAllCodesAll [] = pure []
+parseAllCodesAll (x:xs) = do
+    code <- catchAny (parseCodeAll x) $ \e -> do putStrLn (x ++ ": fájl beolvasása sikertelen, a program nem kezeli."); pure Nothing
+    cs <- parseAllCodesAll xs
     case code of
         Just c -> pure (c:cs)
         Nothing -> pure cs
