@@ -13,10 +13,13 @@ jobs:
   build:
     strategy:
       matrix:
+        ghc : ['9.8.2']
         os:
-          - windows-latest
           - ubuntu-latest
           - macos-latest
+        include:
+          - os: windows-latest
+            ghc: '9.6.5'
 
     runs-on: ${{ matrix.os }}
 
@@ -25,8 +28,8 @@ jobs:
     - uses: haskell-actions/setup@v2 
       id: cabal-setup
       with:
-        ghc-version: '9.8.2'
-        cabal-version: '3.6.2.0'
+        ghc-version: ${{ matrix.ghc }}
+        cabal-version: 'latest'
 
     - name : Configure cabal
       run : |
@@ -55,6 +58,8 @@ jobs:
       with:
         path: ${{ steps.cabal-setup.outputs.cabal-store }}
         key: ${{ steps.cache.outputs.cache-primary-key }}
+    - name : Run Tests
+      run: cabal test
     - name: Build
       run: cabal build hapl --ghc-options=-O2
     - name: Upload artifact
