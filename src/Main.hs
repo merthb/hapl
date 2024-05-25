@@ -3,60 +3,61 @@ module Main (main) where
 import System.IO
 import System.Exit
 import System.Directory
+import System.FilePath
+import System.FilePath.Glob
+import System.Environment
 import Graph
 import Algorithm
 import Language.Haskell.Exts.Simple
-import System.FilePath
-import Control.Parallel.Strategies
 import Data.List
-import System.Environment
+import Data.Char
 import Control.Exception
+import Control.DeepSeq
+import Control.Parallel.Strategies
 
 type FunName = String
 
 main :: IO ()
 main = do
     args <- getArgs
-    case args of
-        [] -> do
+    case handleArgs args of
+        Just ([], []) -> do
             putStrLn "HAPL - Haskell Plágiumellenőrző szoftver \n"
             putStrLn "Ez egy konzolos alkalmazás, amely specifikusan Haskell nyelvben írt programok közt keresi az egyezéseket."
             putStrLn "A programok struktúráját vizsgálja, felépíti azok függvényhívási gráfját, majd részgráf egyezéseket keresve"
             putStrLn "adja meg az egyezési százalékot.\n"
             loop
-        (file:[]) -> do
-            b <- System.Directory.doesFileExist file
-            case b of
-                True -> do
-                    content <- readFile file
-                    case (words $ head $ lines content) of
-                        [] -> do
-                            codes' <- parseAllCodesAll (filter System.FilePath.isValid $ tail $ lines content)
-                            putStrLn "Programok teljes gráfjainak egyezési százalékai:\n"
-                            putStrLn $ writeResAll (runOnAll codes') 1
-                        _ -> do
-                            codes <- parseAllCodes (filter System.FilePath.isValid $ tail $ lines content) (words $ head $ lines content)
-                            resps <- runParallel codes
-                            putStrLn "A függvényenként felépített gráfok egyezési százalékai:\n"
-                            putStrLn $ writeRes resps 1 (words $ head $ lines content)
-                            putStrLn ""
-                            codes' <- parseAllCodesAll (filter System.FilePath.isValid $ tail $ lines content)
-                            resps' <- runParallel codes'
-                            putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
-                            putStrLn $ writeResAll resps' 1
-                            putStrLn "Nyomjon ENTER-t a kilépéshez!"
-                            x <- getLine
-                            exitSuccess
-                False -> do
-                    putStrLn "Invalid paraméter: A megadott fájl nem létezik."
-                    putStrLn "Nyomjon ENTER-t a kilépéshez!"
-                    x <- getLine
-                    exitFailure
-        _ -> do
-            putStrLn "Túl sok paraméter: A program csak az információkat tartalmazó fájl elérési útját várja paraméterül."
+        Just ([], paths) -> do
+            files <- mapM glob paths
+            codes' <- parseAllCodesAll (concat files)
+            putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
+            putStrLn $ writeResAll (runParallel codes') 1
+            putStrLn "Nyomjon ENTER-t a kilépéshez!"
+            x <- getLine
+            exitSuccess
+        Just (fs, paths) -> do
+            files <- mapM glob paths
+            codes <- parseAllCodes (concat files) fs
+            putStrLn "A függvényenként felépített gráfok egyezési százalékai:\n"
+            putStrLn $ writeRes (runParallel codes) 1 fs
+            putStrLn ""
+            codes' <- parseAllCodesAll (concat files)
+            putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
+            putStrLn $ writeResAll (runParallel codes') 1
+            putStrLn "Nyomjon ENTER-t a kilépéshez!"
+            x <- getLine
+            exitSuccess
+        Nothing -> do
+            putStrLn "A paraméter átadás nem megfelelő! A függvényneveket '-functions' paraméter után, a fájlokat '-files' paraméter után kell felsorolni."
             putStrLn "Nyomjon ENTER-t a kilépéshez!"
             x <- getLine
             exitFailure
+
+handleArgs :: [String] -> Maybe ([String], [String])
+handleArgs [] = Just ([],[])
+handleArgs ("-functions":xs) = Just (takeWhile (\x -> x /= "-files") xs, drop 1 (dropWhile (\x -> x /= "-files") xs))
+handleArgs ("-files":xs) = Just (drop 1 (dropWhile (\x -> x /= "-functions") xs), takeWhile (\x -> x /= "-functions") xs)
+handleArgs _ = Nothing
 
 loop :: IO ()
 loop = do
@@ -81,29 +82,24 @@ getMenuItem = do
 
 oneTimeRunner :: IO ()
 oneTimeRunner = do
-    putStrLn "Az ellenőrzés futtatásához szükséges megadni egy szöveges fájl (.txt) elérési útját,"
-    putStrLn "amelyben az alábbi imformációk szerepelnek:"
-    putStrLn "* A fájl első sora tartalmazza a függvények nevét, amelyekre önálló ellenőrzést is futtatni kíván."
-    putStrLn "  Amennyiben nem kíván önálló ellenőrzéseket is futtatni, úgy ezt a sort hagyja üresen."
-    putStrLn "* A fájl második sorától kezdve minden sor egy ellenőrizni kívánt fájl elérési útja kell legyen.\n"
-    putStrLn "Adja meg az információkat tartalmazó szöveges fájl elérési útját:"
-    (fs, paths) <- filePathReader
+    putStrLn "Az ellenőrzés futtatásához szükséges megadni az alábbi imformációkat:"
+    putStrLn "* Azon függvények neveit, amelyekre önálló ellenőrzést is futtatni kíván."
+    putStrLn "* Az ellenőrizni kívánt fájlok elérési útjait.\n"
+    (fs, paths) <- readInput
     case fs of
         [] -> do
             codes' <- parseAllCodesAll paths
             putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
-            putStrLn $ writeResAll (runOnAll codes') 1
+            putStrLn $ writeResAll (runParallel codes') 1
             putStrLn ""
         _ -> do
             codes <- parseAllCodes paths fs
-            resps <- runParallel codes
             putStrLn "\nA függvényenként felépített gráfok egyezési százalékai:\n"
-            putStrLn $ writeRes resps 1 fs
+            putStrLn $ writeRes (runParallel codes) 1 fs
             putStrLn ""
             codes' <- parseAllCodesAll paths
-            resps' <- runParallel codes'
             putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
-            putStrLn $ writeResAll resps' 1
+            putStrLn $ writeResAll (runParallel codes') 1
             putStrLn ""
 
 writeRes :: [Response] -> Int -> [FunName] -> String
@@ -130,13 +126,13 @@ writeResAll (x:xs) n = writeResH x n ++ "\n" ++ writeResAll xs (n + 1) where
 catchAny :: IO a -> (SomeException -> IO a) -> IO a
 catchAny = Control.Exception.catch
 
-runParallel :: [Code] -> IO [Response]
-runParallel = sequence . parMap rpar runAlg . makePairs
+runParallel :: [Code] -> [Response]
+runParallel = parMap rdeepseq runAlg . makePairs
 
-runAlg :: (Code, Code) -> IO Response
-runAlg ((id1, g), (id2, h)) = do
-    matchnums <- sequence $ map (\ (fn, x, y) -> pure $ (fn, mainAlgorithm x y)) (zipOnFunName g h)
-    pure (id1, id2, matchnums)
+runAlg :: (Code, Code) -> Response
+runAlg ((id1, g), (id2, h)) =
+    let matchnums = map (\ (fn, x, y) -> (fn, mainAlgorithm x y)) (zipOnFunName g h)
+    in (id1, id2, matchnums)
 
 parseCode :: FilePath -> [FunName] -> IO (Maybe Code)
 parseCode p fs = do
@@ -189,8 +185,46 @@ parseFilePath = do
                 putStrLn "\nA megadott elrési úton nem szöveges fájl található, ellenőrizze az elérési utat, majd próbálkozzon újra:"
                 parseFilePath
 
-filePathReader :: IO ([FunName],[FilePath])
-filePathReader = do
-    path <- parseFilePath
-    content <- readFile path
-    pure (words $ head $ lines content, filter System.FilePath.isValid $ tail $ lines content)
+readInput :: IO ([FunName], [FilePath])
+readInput = do
+    fs <- getFuns
+    n <- getNum
+    putStrLn "Adja meg az elérési utakat egymás után új sorban!"
+    files <- getFiles n
+    pure (fs, files)
+
+getNum :: IO Int
+getNum = do
+    putStrLn "Adja meg, hány elérési utat kíván megadni (lehet globális minta is)!"
+    x <- getLine
+    if all isDigit x 
+        then pure (read x)
+        else do 
+            putStrLn "A kapott érték nem pozitív szám!"
+            getNum
+
+getFuns :: IO [FunName]
+getFuns = do
+    putStrLn "Adja meg a külön összevetendő függvények neveit szóközzel elválasztva!"
+    putStrLn "Ügyeljen a helyesírásra, csak azok a függvények kerülnek az eredménybe, amelyek ténylegesen szerepelnek a kódokban."
+    x <- getLine
+    pure (words x)
+
+getFiles :: Int -> IO [FilePath]
+getFiles 0 = pure []
+getFiles n = do
+    fs <- getFile
+    fss <- getFiles (n - 1)
+    pure (fs ++ fss)
+
+getFile :: IO [FilePath]
+getFile = do
+    x <- getLine
+    fs <- glob x
+    if null fs
+        then if System.FilePath.isValid x
+            then pure [x]
+            else do 
+                putStrLn "Invalid elérési út, próbálja újra!"
+                getFile
+        else pure fs

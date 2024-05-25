@@ -41,7 +41,8 @@ executable hapl
         parallel,
         directory,
         HUnit,
-        algebraic-graphs
+        deepseq,
+        Glob
     hs-source-dirs:   src
     default-language: GHC2021
 
@@ -67,4 +68,5 @@ Test-Suite test-hapl
         parallel,
         directory,
         HUnit,
-        algebraic-graphs
+        deepseq,
+        Glob
