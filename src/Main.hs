@@ -27,6 +27,11 @@ main = do
             putStrLn "A programok struktúráját vizsgálja, felépíti azok függvényhívási gráfját, majd részgráf egyezéseket keresve"
             putStrLn "adja meg az egyezési százalékot.\n"
             loop
+        Just (_, []) -> do
+            putStrLn "Nincs megadva vizsgálandó fájl!"
+            putStrLn "Nyomjon ENTER-t a kilépéshez!"
+            x <- getLine
+            exitSuccess
         Just ([], paths) -> do
             files <- mapM glob paths
             codes' <- parseAllCodesAll (concat files)
