@@ -84,7 +84,7 @@ oneTimeRunner :: IO ()
 oneTimeRunner = do
     putStrLn "Az ellenőrzés futtatásához szükséges megadni az alábbi imformációkat:"
     putStrLn "* Azon függvények neveit, amelyekre önálló ellenőrzést is futtatni kíván."
-    putStrLn "* Az ellenőrizni kívánt fájlok elérési útjait.\n"
+    putStrLn "* Az ellenőrizni kívánt fájlok elérési útjait (lehet globális minta is).\n"
     (fs, paths) <- readInput
     case fs of
         [] -> do
@@ -195,10 +195,14 @@ readInput = do
 
 getNum :: IO Int
 getNum = do
-    putStrLn "Adja meg, hány elérési utat kíván megadni (lehet globális minta is)!"
+    putStrLn "Adja meg, hány elérési úton találhatóak az ellenőrizendő fájlok!"
     x <- getLine
-    if all isDigit x 
-        then pure (read x)
+    if all isDigit x && not (null x)
+        then if x /= ['0'] 
+            then pure (read x)
+            else do 
+                putStrLn "A kapott érték nem pozitív szám!"
+                getNum
         else do 
             putStrLn "A kapott érték nem pozitív szám!"
             getNum
@@ -220,11 +224,16 @@ getFiles n = do
 getFile :: IO [FilePath]
 getFile = do
     x <- getLine
-    fs <- glob x
-    if null fs
-        then if System.FilePath.isValid x
-            then pure [x]
-            else do 
-                putStrLn "Invalid elérési út, próbálja újra!"
-                getFile
-        else pure fs
+    if not (null x)
+        then do
+            fs <- glob x
+            if null fs
+                then if System.FilePath.isValid x
+                    then pure [x]
+                    else do 
+                        putStrLn "Invalid elérési út, próbálja újra!"
+                        getFile
+                else pure fs
+        else do 
+            putStrLn "Invalid elérési út, próbálja újra!"
+            getFile
