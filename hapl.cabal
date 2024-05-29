@@ -6,12 +6,13 @@ synopsis:           Plagiarism checker for Haskell codes
 -- A longer description of the package.
 -- description:
 homepage:
+    HAPL is a Haskell Plagiarism checker software, that builds call-graphs and matches them using A* algorithm. By searching for the shortest path from one graph to another, so to say it also does subgraph isomorphism check. We get a similarity score from the estimated maximum cost and the actual cost of the shortest path. 
 
 -- A URL where users can report bugs.
 -- bug-reports:
 license:            LGPL-2.1-only
 license-file:       LICENSE
-author:             Merth Borbála
+author:             Borbála, Merth
 maintainer:         borka.merth14@gmail.com
 
 -- A copyright notice.

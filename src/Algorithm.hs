@@ -14,7 +14,7 @@ type Response = (ID, ID, [(String, MatchNum)])
 -- az A* algoritmus heurisztikája
 heuristic :: CallGraph -> CallGraph -> CallGraph -> Int
 heuristic startg goalg g = (min rgn rhn) + 10 * (abs (rgn - rhn)) where 
-    rgn = rg startg g
+    rgn = rg startg goalg g
     rhn = rh goalg g
 
 -- azon csúcsok számossága, amelyek a célgráfban jelen vannak, de a részben transzformált gráfban még nem szerepelnek
@@ -23,11 +23,11 @@ rh goalg (Vertex f fs)
     | f `inG` goalg = HS.foldr (+) 0 $ HS.map (rh goalg) fs
     | otherwise = 1 + (HS.foldr (+) 0 $ HS.map (rh goalg) fs)
 
--- azon csúcsok számossága, amelyek a kiindulási gráfból még jelen vannak a részben transzformált gráfban
-rg :: CallGraph -> CallGraph -> Int
-rg startg (Vertex f fs)
-    | f `inG` startg = 1 + (HS.foldr (+) 0 $ HS.map (rg startg) fs)
-    | otherwise = HS.foldr (+) 0 $ HS.map (rg startg) fs
+-- azon csúcsok számossága, amelyek a kiindulási gráfból még jelen vannak a részben transzformált gráfban, de a célgráfban nem
+rg :: CallGraph -> CallGraph -> CallGraph -> Int
+rg startg goalg (Vertex f fs)
+    | f `inG` startg && not (f `inG` goalg) = 1 + (HS.foldr (+) 0 $ HS.map (rg startg goalg) fs)
+    | otherwise = HS.foldr (+) 0 $ HS.map (rg startg goalg) fs
 
 -- az A* algoritmus szomszédkereső függvénye
 neighbors :: CallGraph -> CallGraph -> HS.HashSet CallGraph
