@@ -29,6 +29,7 @@ executable hapl
     other-modules:
         Graph
         Algorithm
+        SubISO
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -38,7 +39,9 @@ executable hapl
         filepath,
         astar,
         hashable,
+        containers,
         unordered-containers,
+        algebraic-graphs,
         parallel,
         directory,
         HUnit,
@@ -66,6 +69,7 @@ Test-Suite test-hapl
         astar,
         hashable,
         unordered-containers,
+        algebraic-graphs,
         parallel,
         directory,
         HUnit,

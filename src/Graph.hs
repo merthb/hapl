@@ -1,55 +1,34 @@
 {-# LANGUAGE GADTs #-}
-module Graph (Graph (..),Function (..),CallGraph,preludeFuns,toFun,allDifferent,parseInFile,prep,functionCalls,handleRecursion,getCallGraphs,wholeCodeGraph,inG,vertNum,edgeNum,startsWith,deleteEdge,insertEdge) where
+module Graph where
+
 import Language.Haskell.Exts.Simple
 import Data.List
 import Data.Hashable
 import qualified Data.HashSet as HS
+import Algebra.Graph.AdjacencyMap
 
 -- ez a modul a gráfépítés műveleteit tartalmazza
 
 
-data Graph a = Vertex {node :: a, edges :: HS.HashSet (Graph a)}
-    deriving (Show, Eq, Ord)
+-- data Graph a = Vertex {node :: a, edges :: HS.HashSet (Graph a)}
+--     deriving (Show, Eq, Ord)
 
-instance (Hashable a) => Hashable (Graph a) where
-    hashWithSalt salt (Vertex val children) = hashWithSalt (hashWithSalt salt val) childrenHash where
-        childrenHash = HS.foldr hashWithSalt 0 (HS.map (hashWithSalt salt) children)
+-- instance (Hashable a) => Hashable (Graph a) where
+--     hashWithSalt salt (Vertex val children) = hashWithSalt (hashWithSalt salt val) childrenHash where
+--         childrenHash = HS.foldr hashWithSalt 0 (HS.map (hashWithSalt salt) children)
 
-data Function = F String String Bool
+type FName = String
+type FType = String
+
+data Function = F FName FType
     deriving (Show, Eq, Ord)
 
 instance Hashable Function where
-    hashWithSalt salt (F name typ boolVal) = hashWithSalt (hashWithSalt (hashWithSalt salt name) typ) boolVal
+    hashWithSalt salt (F name typ) = hashWithSalt (hashWithSalt salt name) typ
 
-type CallGraph = Graph Function
+type CallGraph = AdjacencyMap FName
 
 ------------- általánosan hasznos műveletek ----------------------------
-
--- eldönti, hogy egy adott függvény megtalálható-e a gráf bármely csúcsában
-inG :: Function -> CallGraph -> Bool
-inG f (Vertex v vs)
-    | f == v = True
-    | otherwise = HS.foldr (||) False $ HS.map (inG f) vs
-
--- a gráf csúcsainak számosságát határozza meg
-vertNum :: CallGraph -> Int
-vertNum (Vertex f fs) = 1 + HS.foldr (+) 0 (HS.map vertNum fs)
-
--- a gráf éleinek számosságát határozza meg
-edgeNum :: CallGraph -> Int
-edgeNum (Vertex f fs) = HS.size fs + HS.foldr (+) 0 (HS.map edgeNum fs)
-
--- beilleszti az első gráf fő csúcsának élei közé a második gráfot
-insertEdge :: CallGraph -> CallGraph -> CallGraph
-insertEdge (Vertex f fs) g = Vertex f (HS.insert g fs)
-
--- kitörli az első gráf fő csúcsának élei közül a második gráfot
-deleteEdge :: CallGraph -> CallGraph -> CallGraph
-deleteEdge (Vertex f fs) g = Vertex f (HS.delete g fs)
-
--- eldönti, hogy a gráf fő csúcsában az adott függvény szerepel-e
-startsWith :: Function -> CallGraph -> Bool
-startsWith f (Vertex g _) = f == g
 
 -- egy Type típusú értéket szöveggé alakít
 showType :: Type -> String
@@ -74,7 +53,7 @@ preludeFuns = ["case", "if", "length", "map", "filter", "all", "any", "and", "or
 
 -- előállít egy üres típusszignatúrájú, nem rekurzív függvényt az alábbi névvel
 toFun :: String -> Function
-toFun xs = F xs "" False
+toFun xs = F xs ""
 
 -- kinyeri a szöveget a Name típusú értékből
 getName :: Name -> String
@@ -93,13 +72,13 @@ allDifferent (x:xs)
     | myelem x xs = False 
     | otherwise = allDifferent xs where
         myelem :: Function -> [Function] -> Bool
-        myelem (F fn _ _) fs = not $ null $ filter (\ (F gn _ _) -> fn == gn) fs
+        myelem (F fn _) fs = not $ null $ filter (\ (F gn _) -> fn == gn) fs
 
 -- ez a függvény végzi el az előfeldolgozást
 -- ad típusszignatúrát azoknak a függvényeknek, amelyek még nem rendelkeznek eggyel
 -- majd átnevezi a lokális szkópban levő függvények közül azokat, amelyekből több is van a kódban
 prep :: [Decl] -> [Decl]
-prep xs = prep' $ addTypeSig xs $ map (\ (F n _ _) -> n) $ parseInFile xs where
+prep xs = prep' $ addTypeSig xs $ map (\ (F n _) -> n) $ parseInFile xs where
     -- ez a függvény végzi el mindaddig az átnevezéseket, míg minden függvény neve különböző nem lesz
     -- ez legtöbb esetben nem igényel rekurziót
     prep' :: [Decl] -> [Decl]
@@ -115,11 +94,11 @@ prep xs = prep' $ addTypeSig xs $ map (\ (F n _ _) -> n) $ parseInFile xs where
             -- megkeresi azokat a függvényeket, amelyekből egynél több van
             -- majd minden ilyen csoportból egy elemet levesz, a többihez pedig legenerálja az új neveket
             whatToRename :: [Function] -> [(String, String)]
-            whatToRename xs = concatMap (\ xs -> genRenames (drop 1 xs) 1) $ filter (\ as -> case as of [] -> False; [x] -> False; _ -> True) $ groupBy (\ (F fn _ _) (F gn _ _) -> fn == gn) $ sortBy (\ (F fn _ _) (F gn _ _) -> compare fn gn) xs where
+            whatToRename xs = concatMap (\ xs -> genRenames (drop 1 xs) 1) $ filter (\ as -> case as of [] -> False; [x] -> False; _ -> True) $ groupBy (\ (F fn _) (F gn _) -> fn == gn) $ sortBy (\ (F fn _) (F gn _) -> compare fn gn) xs where
                 -- minden függvény neve elé annyi '.'-ot tesz, ahanyadik elem a listában
                 genRenames :: [Function] -> Int -> [(String, String)]
                 genRenames [] _ = []
-                genRenames ((F x _ _):xs) n = (x, replicate n '.' ++ x) : genRenames xs (n + 1)
+                genRenames ((F x _):xs) n = (x, replicate n '.' ++ x) : genRenames xs (n + 1)
     -- beteszi a megfelelő típusszignatúrákat azon függvények elé, amelyek még nem rendelkeznek eggyel
     addTypeSig :: [Decl] -> [String] -> [Decl]
     addTypeSig [] _ = []
@@ -300,7 +279,7 @@ parseInFile xs = parseDec xs []
 parseDec :: [Decl] -> [Function] -> [Function]
 parseDec [] _ = []
 parseDec ((TypeSig names ty):xs) fs = news ++ parseDec xs (news ++ fs) where
-    news = map (\ name -> case name of Ident xs -> F xs (showType ty) False; Symbol xs -> F xs (showType ty) False) names
+    news = map (\ name -> case name of Ident xs -> F xs (showType ty); Symbol xs -> F xs (showType ty)) names
 parseDec ((PatBind _ _ binds):xs) fs = news ++ parseDec xs (news ++ fs) where
     news = fromBinds binds fs
 parseDec ((FunBind (m:atches)):xs) fs = news ++ parseDec xs (news ++ fs) where
@@ -325,14 +304,14 @@ functionCalls (f:fs) kf dl = (f, nub (getCalls f kf dl)) : functionCalls fs kf d
         -- összeszedi a függvényhívásokat a függvénydefinícióban
         fromMatches :: Function -> [Match] -> [Function] -> [Function]
         fromMatches _ [] _ = []
-        fromMatches f@(F n t r) ((Match fn _ rhs binds):ms) kf
+        fromMatches f@(F n t) ((Match fn _ rhs binds):ms) kf
             | n == getName fn = fromRhs rhs kf ++ callsFromBinds binds kf ++ fromMatches f ms kf
             | otherwise = callsFromBindsF binds f kf ++ fromMatches f ms kf where
                 fromRhs :: Rhs -> [Function] -> [Function]
                 fromRhs (UnGuardedRhs exp) kf = evalExp exp kf
                 fromRhs (GuardedRhss rhss) kf = concatMap (\ (GuardedRhs stmt exp) -> evalExp exp kf ++ procStmt (RecStmt stmt) kf) rhss
         fromMatches f (_:ms) kf = fromMatches f ms kf
-    getCalls f@(F n t r) kf ((PatBind (PVar name) rhs binds):xs)
+    getCalls f@(F n t) kf ((PatBind (PVar name) rhs binds):xs)
         | n == getName name = callsFromBinds binds kf ++ (case rhs of (UnGuardedRhs exp) -> evalExp exp kf; (GuardedRhss rhss) -> concatMap (\ (GuardedRhs stmt exp) -> evalExp exp kf ++ procStmt (RecStmt stmt) kf) rhss;) ++ getCalls f kf xs
         | otherwise = callsFromBindsF binds f kf ++ getCalls f kf xs
     getCalls f kf (_:xs) = getCalls f kf xs
@@ -349,7 +328,7 @@ callsFromBindsF (Just (BDecls decls)) f kf = helperF f kf decls where
         getCallsF f kf ((FunBind matches):xs) = fromMatches f matches kf ++ getCallsF f kf xs where
             fromMatches :: Function -> [Match] -> [Function] -> [Function]
             fromMatches _ [] _ = []
-            fromMatches f@(F n t r) ((Match fn _ rhs binds):ms) kf
+            fromMatches f@(F n t) ((Match fn _ rhs binds):ms) kf
                 | n == getName fn = fromRhs rhs kf ++ callsFromBinds binds kf ++ fromMatches f ms kf
                 | otherwise = callsFromBindsF binds f kf ++ fromMatches f ms kf where
                     fromRhs :: Rhs -> [Function] -> [Function]
@@ -375,12 +354,12 @@ callsFromBinds _ _ = []
 -- összegyűjti az összes ismert függvényt, amely megtalálható a kifejezésben
 evalExp :: Exp -> [Function] -> [Function]
 evalExp (Var name) kf
-    | Just f <- find (\ (F fn _ _) -> n == fn) kf = [f]
+    | Just f <- find (\ (F fn _) -> n == fn) kf = [f]
     | otherwise = [] where
         n = (case name of Qual _ (Ident xs) -> xs; Qual _ (Symbol xs) -> xs; UnQual (Ident xs) -> xs; UnQual (Symbol xs) -> xs; _ -> "";)
 evalExp (App exp1 exp2) kf = evalExp exp1 kf ++ evalExp exp2 kf
 evalExp (InfixApp exp1 (QVarOp name) exp2) kf
-    | Just f <- find (\ (F fn _ _) -> n == fn) kf = f : evalExp exp1 kf ++ evalExp exp2 kf
+    | Just f <- find (\ (F fn _) -> n == fn) kf = f : evalExp exp1 kf ++ evalExp exp2 kf
     | otherwise = evalExp exp1 kf ++ evalExp exp2 kf where
         n = (case name of Qual _ (Ident xs) -> xs; Qual _ (Symbol xs) -> xs; UnQual (Ident xs) -> xs; UnQual (Symbol xs) -> xs; _ -> "";)
 evalExp (InfixApp exp1 _ exp2) kf = evalExp exp1 kf ++ evalExp exp2 kf
@@ -422,70 +401,26 @@ procQStmt (GroupBy exp) kf = evalExp exp kf
 procQStmt (GroupUsing exp) kf = evalExp exp kf
 procQStmt (GroupByUsing exp1 exp2) kf = evalExp exp1 kf ++ evalExp exp2 kf
 
--- elvégzi a rekurzivitás helyes kezelését
-handleRecursion :: [(Function, [Function])] -> [(Function, [Function])]
-handleRecursion xs = flagRecursion (findRec xs) xs where
-    -- minden önmagára hivatkozó függvénynek igazra állítja a rekurzivitását a teljes szótárban
-    flagRecursion :: [Function] -> [(Function, [Function])] -> [(Function, [Function])]
-    flagRecursion [] xs = xs
-    flagRecursion (f@(F n t r):fs) xs = flagRecursion fs $ map (setRec f) xs where
-        -- elvégzi a beállítást egyetlen szótárbeli elemen
-        setRec :: Function -> (Function, [Function]) -> (Function, [Function])
-        setRec f@(F n t r) (g@(F n1 _ _), fs)
-            | n == n1 = (f, delete (F n t False) fs)
-            | otherwise = (g, map (\ h@(F n2 t2 r2) -> if n == n2 then f else h) fs)
-    -- kigyűjti az önmagukra hivatkozó függvényeket
-    findRec :: [(Function, [Function])] -> [Function]
-    findRec [] = []
-    findRec ((f@(F n t r), fs):xs)
-        | elem f fs = F n t True : findRec xs
-        | otherwise = findRec xs
-
 -------------- gráfépítés --------------------------
 
--- előállítja minden listában szereplő függvény függvényhívási gráfját
-getCallGraphs :: [String] {-függvénynevek-} -> [Decl] -> [CallGraph]
-getCallGraphs fsn decl = filter (\ (Vertex (F n t r) fs) -> elem (dropWhile (=='.') n) fsn) $ map (genGraph dict []) dict where
+dictToNoType :: [(Function, [Function])] -> [(FName, [FName])]
+dictToNoType = map (\(f, fs) -> (eraseType f, map eraseType fs)) where
+    eraseType :: Function -> FName
+    eraseType (F n _) = n
+
+genGraphs :: [Decl] -> [FName] -> [CallGraph]
+genGraphs decl funs = map (\ f -> fun f) funs where
     pdecl = prep decl
     fs = parseInFile pdecl
     d = functionCalls fs (fs ++ map toFun preludeFuns) pdecl
-    dict = handleRecursion d
+    dict = dictToNoType d
+    fun f = case lookup f dict of
+        Just ls -> edges (map (f,) ls)
+        Nothing -> empty
 
--- előállítja egy függvény gráfját a szótár segítségével
-genGraph :: [(Function, [Function])] -> [Function] -> (Function, [Function]) -> CallGraph
-genGraph dict procc (f, fs) = Vertex f $ HS.fromList $ genChilds childs dict (f:procc) where
-    childs = findRoots $ filter (\ (g, gs) -> elem g fs) dict
-    genChilds :: [Function] -> [(Function, [Function])] -> [Function] -> [CallGraph]
-    genChilds [] _ _ = []
-    genChilds (f@(F n "" r):fs) d p = Vertex f HS.empty : genChilds fs d p
-    genChilds (f:fs) dict processed
-        | Just fss <- lookup f dict = genGraph dict processed (f, filter (\ g -> not $ elem g processed) fss) : genChilds fs dict processed
-        | otherwise = genChilds fs dict processed
-
--- megkeresi a fő függvényeket (azokat, amiket nem hív meg egyetlen másik függvény sem)
-findRoots :: [(Function, [Function])] -> [Function]
-findRoots dict = filtered where
-        (fsts, snds) = unzip dict
-        filtered = filter (\ f -> not $ elem f (concat snds)) fsts
-
--- összeilleszti a fő függvények gráfjait egyetlen "dummy root" alá
-merge :: [(Function, [Function])] -> CallGraph
-merge dict
-    | null roots = Vertex (F "dummy" "" False) $ HS.fromList $ getAllCircles graphs []
-    | null (drop 1 roots) = head $ map snd $ filter (\ (f, g) -> elem f roots) graphs
-    | not (null roots) = Vertex (F "dummy" "" False) $ HS.fromList $ map snd $ filter (\ (f, g) -> elem f roots) graphs where
-        roots = findRoots dict
-        graphs = map (\ (f, fs) -> (f, genGraph dict [] (f, fs))) dict
-        getAllCircles :: [(Function, CallGraph)] -> [CallGraph] -> [CallGraph]
-        getAllCircles [] found = found
-        getAllCircles ((f, g):gs) found
-            | any (inG f) found = getAllCircles gs found
-            | otherwise = getAllCircles gs (g:found)
-
--- előállítja a függvényhívási gráfot a teljes programhoz
-wholeCodeGraph :: [Decl] -> CallGraph
-wholeCodeGraph decl = merge dict where
+genCodeGraph :: [Decl] -> CallGraph
+genCodeGraph decl = edges $ concatMap (\(x,ls) -> (map (x,) ls)) dict where
     pdecl = prep decl
     fs = parseInFile pdecl
     d = functionCalls fs (fs ++ map toFun preludeFuns) pdecl
-    dict = handleRecursion d
+    dict = dictToNoType d

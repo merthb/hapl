@@ -14,8 +14,10 @@ import Data.Char
 import Control.Exception
 import Control.DeepSeq
 import Control.Parallel.Strategies
+import qualified Data.Map as Map
 
-type FunName = String
+type Code = (String, [CallGraph])
+type Response = (String, String, [[[Map.Map FName FName]]])
 
 main :: IO ()
 main = do
@@ -36,7 +38,7 @@ main = do
             files <- mapM glob paths
             codes' <- parseAllCodesAll (concat files)
             putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
-            putStrLn $ writeResAll (runParallel codes') 1
+            putStrLn $ show $ runParallel codes'
             putStrLn "Nyomjon ENTER-t a kilépéshez!"
             x <- getLine
             exitSuccess
@@ -46,9 +48,9 @@ main = do
             putStrLn "A függvényenként felépített gráfok egyezési százalékai:\n"
             putStrLn $ writeRes (runParallel codes) 1 fs
             putStrLn ""
-            codes' <- parseAllCodesAll (concat files)
-            putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
-            putStrLn $ writeResAll (runParallel codes') 1
+            -- codes' <- parseAllCodesAll (concat files)
+            -- putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
+            -- putStrLn $ show $ runParallel codes'
             putStrLn "Nyomjon ENTER-t a kilépéshez!"
             x <- getLine
             exitSuccess
@@ -57,6 +59,18 @@ main = do
             putStrLn "Nyomjon ENTER-t a kilépéshez!"
             x <- getLine
             exitFailure
+
+writeRes :: [Response] -> Integer -> [FName] -> String
+writeRes [] _ _ = ""
+writeRes ((id1, id2, mappings):xs) i fs = show i ++ ". pár: " ++ id1 ++ " <-> " ++ id2 ++ "\n" ++ writeOutMappings mappings fs ++ "\n" ++ writeRes xs (i + 1) fs where
+    writeOutMappings :: [[[Map.Map FName FName]]] -> [FName] -> String
+    writeOutMappings [] _ = "Nincs egyező struktúra."
+    writeOutMappings [xs] [f] = f ++ " függvény gyanús párosításai: " ++ showMappings xs ++ "\n"
+    writeOutMappings (xs:xss) (f:fs) = f ++ " függvény gyanús párosításai: " ++ showMappings xs ++ "\n" ++ writeOutMappings xss fs
+
+    showMappings :: [[Map.Map FName FName]] -> String
+    showMappings [] = "Nincs egyező struktúra!"
+    showMappings ms = show $ map (map (Map.foldrWithKey (\ key value acc -> (key, value) : acc) [])) ms
 
 handleArgs :: [String] -> Maybe ([String], [String])
 handleArgs [] = Just ([],[])
@@ -95,7 +109,7 @@ oneTimeRunner = do
         [] -> do
             codes' <- parseAllCodesAll paths
             putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
-            putStrLn $ writeResAll (runParallel codes') 1
+            putStrLn $ show $ runParallel codes'
             putStrLn ""
         _ -> do
             codes <- parseAllCodes paths fs
@@ -104,49 +118,32 @@ oneTimeRunner = do
             putStrLn ""
             codes' <- parseAllCodesAll paths
             putStrLn "\nProgramok teljes gráfjainak egyezési százalékai:\n"
-            putStrLn $ writeResAll (runParallel codes') 1
+            putStrLn $ show $ runParallel codes'
             putStrLn ""
-
-writeRes :: [Response] -> Int -> [FunName] -> String
-writeRes [] _ _ = ""
-writeRes (x:xs) n fs = writeResH x n fs ++ "\n" ++ writeRes xs (n + 1) fs where
-    writeResH :: Response -> Int -> [FunName] -> String
-    writeResH (id1, id2, matches) i fs = show i ++ ". " ++ show id1 ++ " <->\n" ++ show id2 ++ ":\n" ++ showMatches matches fs where
-        showMatches :: [(String, MatchNum)] -> [FunName] -> String
-        showMatches [] _ = ""
-        showMatches _ [] = ""
-        showMatches resps (x:xs)
-            | Just num <- lookup x resps = '\t' : x ++ ": " ++ show num ++ "%\n" ++ showMatches resps xs
-            | otherwise = showMatches resps xs
-
-writeResAll :: [Response] -> Int -> String
-writeResAll [] _ = ""
-writeResAll (x:xs) n = writeResH x n ++ "\n" ++ writeResAll xs (n + 1) where
-    writeResH :: Response -> Int -> String
-    writeResH (id1, id2, matches) i = show i ++ ". " ++ show id1 ++ " <->\n" ++ show id2 ++ ":\n" ++ showMatches matches where
-        showMatches :: [(String, MatchNum)] -> String
-        showMatches [] = ""
-        showMatches ((f, num):xs) = '\t' : "egyezés: " ++ show num ++ "%\n" ++ showMatches xs
 
 catchAny :: IO a -> (SomeException -> IO a) -> IO a
 catchAny = Control.Exception.catch
 
 runParallel :: [Code] -> [Response]
-runParallel = parMap rdeepseq runAlg . makePairs
+runParallel = parMap rdeepseq runAlg . makePairs where
+    makePairs :: [a] -> [(a, a)]
+    makePairs [] = []
+    makePairs (x:xs) = pairElement x xs ++ makePairs xs where
+        pairElement :: a -> [a] -> [(a,a)]
+        pairElement _ [] = []
+        pairElement e (x:xs) = (e , x) : pairElement e xs
 
 runAlg :: (Code, Code) -> Response
-runAlg ((id1, g), (id2, h)) =
-    let matchnums = map (\ (fn, x, y) -> (fn, mainAlgorithm x y)) (zipOnFunName g h)
-    in (id1, id2, matchnums)
+runAlg ((id1, gs), (id2, hs)) = (id1, id2, map (uncurry searchMappings) (zip gs hs))
 
-parseCode :: FilePath -> [FunName] -> IO (Maybe Code)
+parseCode :: FilePath -> [FName] -> IO (Maybe Code)
 parseCode p fs = do
     x <- parseFile p
     case x of 
-        ParseOk (Module _ _ _ d) -> pure $ Just (p, getCallGraphs fs d)
+        ParseOk (Module _ _ _ d) -> pure $ Just (p, genGraphs d fs)
         _ -> pure Nothing
 
-parseAllCodes :: [FilePath] -> [FunName] -> IO [Code]
+parseAllCodes :: [FilePath] -> [FName] -> IO [Code]
 parseAllCodes [] _ = pure []
 parseAllCodes (x:xs) fs = do
     code <- catchAny (parseCode x fs) $ \e -> do putStrLn (x ++ ": fájl beolvasása sikertelen, a program nem kezeli."); pure Nothing
@@ -160,7 +157,7 @@ parseCodeAll :: FilePath -> IO (Maybe Code)
 parseCodeAll p = do
     x <- parseFile p
     case x of
-        ParseOk (Module _ _ _ d) -> pure $ Just (p, [wholeCodeGraph d])
+        ParseOk (Module _ _ _ d) -> pure $ Just (p, [genCodeGraph d])
         _ -> pure Nothing
 
 -- whole code graph parser
@@ -190,7 +187,7 @@ parseFilePath = do
                 putStrLn "\nA megadott elrési úton nem szöveges fájl található, ellenőrizze az elérési utat, majd próbálkozzon újra:"
                 parseFilePath
 
-readInput :: IO ([FunName], [FilePath])
+readInput :: IO ([FName], [FilePath])
 readInput = do
     fs <- getFuns
     n <- getNum
@@ -212,7 +209,7 @@ getNum = do
             putStrLn "A kapott érték nem pozitív szám!"
             getNum
 
-getFuns :: IO [FunName]
+getFuns :: IO [FName]
 getFuns = do
     putStrLn "Adja meg a külön összevetendő függvények neveit szóközzel elválasztva!"
     putStrLn "Ügyeljen a helyesírásra, csak azok a függvények kerülnek az eredménybe, amelyek ténylegesen szerepelnek a kódokban."
